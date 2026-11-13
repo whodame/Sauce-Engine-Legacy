@@ -1589,11 +1589,15 @@ void *CStdMemAlloc::Expand_NoLongerSupported( void *pMem, size_t nSize, const ch
 
 #if defined (LINUX)
 #include <malloc.h>
+#elif defined (__FreeBSD__) || defined( PLATFORM_FBSD )
+#include <malloc_np.h>
 #elif defined (OSX)
 #define malloc_usable_size( ptr ) malloc_size( ptr )
 extern "C" {
 	extern size_t malloc_size( const void *ptr );
 }
+#elif defined (__OpenBSD__) || defined( PLATFORM_OPENBSD ) || defined (PLATFORM_BSD)
+#define malloc_usable_size( ptr ) ( 0 )
 #endif
 
 //-----------------------------------------------------------------------------

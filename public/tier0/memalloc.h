@@ -474,7 +474,7 @@ inline void MemAlloc_CheckAlloc( void *ptr, size_t nSize )
 		MemAllocOOMError( nSize );
 }
 
-#if defined( OSX )
+#if defined( OSX ) || defined( PLATFORM_BSD ) || defined( __OpenBSD__ ) || defined( PLATFORM_OPENBSD )
 inline void *memalign(size_t alignment, size_t size) {
     // MoeMod : 64bit fix
     if(alignment < sizeof(void *))
@@ -497,6 +497,8 @@ inline void MemAlloc_FreeAligned( void *pMemBlock, const char *pszFile = NULL, i
 
 #if defined( OSX )
 inline size_t _msize( void *ptr )																					{ return malloc_size( ptr ); }
+#elif defined( __OpenBSD__ ) || defined( PLATFORM_OPENBSD )
+inline size_t _msize( void *ptr )																					{ return 0; }
 #else
 inline size_t _msize( void *ptr )																					{ return malloc_usable_size( ptr ); }
 #endif

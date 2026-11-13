@@ -58,6 +58,7 @@ def build(bld):
 		'mathlib',
 		'vstdlib',
 		'choreoobjects',
+		'SDL2',
 		'steam_api',
 		'bitmap',
 		'vtf',
