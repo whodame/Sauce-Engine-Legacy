@@ -41,7 +41,11 @@
 #include <dirent.h>
 #include <unistd.h> // for unlink
 #include <limits.h> // defines PATH_MAX
+#if defined(OSX) || defined(PLATFORM_BSD) || defined(__OpenBSD__) || defined(PLATFORM_OPENBSD) || defined(__FreeBSD__) || defined(__NetBSD__)
+#include <stdlib.h>
+#else
 #include <alloca.h> // 'cause we like smashing the stack
+#endif
 #if defined( _PS3 )
 #include <fcntl.h>
 #else

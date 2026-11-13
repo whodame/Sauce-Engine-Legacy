@@ -3,7 +3,11 @@
 #include <ivp_physics.hxx>
 
 #if defined(LINUX) || defined(SUN) || (defined(__MWERKS__) && defined(__POWERPC__))
-#   include <alloca.h>
+#   if defined(PLATFORM_BSD) || defined(__OpenBSD__) || defined(PLATFORM_OPENBSD) || defined(__FreeBSD__) || defined(__NetBSD__) || defined(OSX)
+#       include <stdlib.h>
+#   else
+#       include <alloca.h>
+#   endif
 #endif
 
 #if !defined(WIN32)
@@ -320,7 +324,7 @@ void IVP_Constraint_Local::do_simulation_controller(IVP_Event_Sim *es,IVP_U_Vect
 	if (diff_axis < -IVP_PI) diff_axis += 2.0f * IVP_PI;
 	// IVP_DOUBLE qlen_rsx = rsx_Rcs.quad_length();  // 0 .. 4
 	// if (qlen_rsx > 3 ) qlen_rsx = 3;
-	drRA_now_rs.k[mapping_uRrs_f_Rrs[IVP_INDEX_X]] = diff_axis;   // hängt von known_axis ab
+	drRA_now_rs.k[mapping_uRrs_f_Rrs[IVP_INDEX_X]] = diff_axis;   // hngt von known_axis ab
 	drRA_now_rs.k[mapping_uRrs_f_Rrs[IVP_INDEX_Y]] = 0.0f;
 	drRA_now_rs.k[mapping_uRrs_f_Rrs[IVP_INDEX_Z]] = 0.0f;
     } else {
@@ -385,14 +389,14 @@ void IVP_Constraint_Local::do_simulation_controller(IVP_Event_Sim *es,IVP_U_Vect
     IVP_U_Point dvRA_fs; // desired differences of speed
     IVP_U_Point drRA_rs; // desired differences of angular velocity
     { // Calc desired velocity difference
-        // Wie siehts im nächsten PSI aus?
+        // Wie siehts im nchsten PSI aus?
 
         // Echte Kurvenberechnung ginge so:
         // aktuelle Position += coreX->speed * d_time
         // aktuelle Position += ... hmm, mueszte mit quaternions gehen, die man aufeinander addiert
         // oder indem man die Achse bestimmt, um die sich das Objekt dreht, und dann in der Rotationsebene
         // den neuen Punkt bestimmt 
-        // Statt echter Kurvenberechnung mache ich nur eine lineare Annäherung.
+        // Statt echter Kurvenberechnung mache ich nur eine lineare Annherung.
 
         // Position:
         IVP_U_Float_Point  v_pointR_ws, v_pointA_ws;
@@ -509,7 +513,7 @@ void IVP_Constraint_Local::do_simulation_controller(IVP_Event_Sim *es,IVP_U_Vect
 	    m_fs_f_Acs.vimult3(&testimpulseA_pointR_fs, &testimpulseA_pointR_Acs);
 	    m_fs_f_ws.vimult3(&testimpulseR_pointR_fs, &testimpulseR_pointR_ws);
 	    m_fs_f_ws.vimult3(&testimpulseA_pointR_fs, &testimpulseA_pointR_ws);
-    /* So funktioniert die Berechnung unter der Annahme, daß sowohl coreR als auch coreA beweglich sind:
+    /* So funktioniert die Berechnung unter der Annahme, da sowohl coreR als auch coreA beweglich sind:
 	    coreR->test_push_core(&pointR_Rcs, &testimpulseR_pointR_Rcs, &testimpulseR_pointR_ws, &dvR_ws, &drR_Rcs);
 	    coreR->inline_get_surface_speed_on_test(&pointR_Rcs, &dvR_ws, &drR_Rcs, &dv_pointR_ws); 
         
@@ -623,8 +627,8 @@ void IVP_Constraint_Local::do_simulation_controller(IVP_Event_Sim *es,IVP_U_Vect
 	}
     }
     
-    // Nun hab ich Matrizen der Größe 0 bis 6.
-    // Noch nicht gemacht: Die unterschiedlichen Matrixgrößen beachten!
+    // Nun hab ich Matrizen der Gre 0 bis 6.
+    // Noch nicht gemacht: Die unterschiedlichen Matrixgren beachten!
     // Matrix erschaffen und vimult3(dvRA, impulseR);
     IVP_Great_Matrix_Many_Zero mg_impulse_f_dvRA;
     mg_impulse_f_dvRA.columns = matrix_size;
@@ -872,7 +876,7 @@ void IVP_Constraint_Local::do_simulation_controller(IVP_Event_Sim *es,IVP_U_Vect
 	coreR->rot_push_core_cs(&impulserotR_Rcs);
 	IVP_IF (1) { // show lines
 	    impulseR_ws.mult(debugfactor * 2.0f * inv_dtime);
-	    coreR->environment->add_draw_vector(&pointR_ws, &impulseR_ws, "", 2); // grün
+	    coreR->environment->add_draw_vector(&pointR_ws, &impulseR_ws, "", 2); // grn
 	    IVP_U_Float_Point impulserotR_ws; m_ws_f_Rcs.vmult3(&impulserotR_Rcs, &impulserotR_ws);
 	    impulserotR_ws.mult(debugfactor * 2.0f * inv_dtime);
 	    coreR->environment->add_draw_vector(&pointR_ws, &impulserotR_ws, "", 5); // gelb
@@ -929,14 +933,14 @@ void IVP_Constraint_Local::change_fixing_point_Ros(const IVP_U_Point *anchor) { 
     IVP_U_Point point_Rfs_f_nRfs; m_Rfs_f_Rcs.vmult4(&point_Rcs_f_nRfs, &point_Rfs_f_nRfs); // point_nRfs_in_Rfs
     m_Rfs_f_Rcs.vv.subtract(&point_Rfs_f_nRfs);
 
-/* if I would have to translate -- wenn ich übersetzen müßte:
+/* if I would have to translate -- wenn ich bersetzen mte:
     IVP_U_Point point_Rcs_f_nuRfs; m_Rcs_f_Ros.vmult4(anchor, &point_Rcs_f_nuRfs);
     IVP_U_Matrix3 m_uRfs_f_Rcs; mapping_uRfs_f_Rfs.mapply((IVP_U_Matrix3 *) &m_Rfs_f_Rcs, &m_uRfs_f_Rcs);
     IVP_U_Point point_nuRfs_f_Rcs; m_uRfs_f_Rcs.vmult3(&point_Rcs_f_nuRfs, &point_nuRfs_f_Rcs);
     point_nuRfs_f_Rcs.set_negative(&point_nuRfs_f_Rcs);
     mapping_uRfs_f_Rfs.viapply(&point_nuRfs_f_Rcs, &m_Rfs_f_Rcs.vv);
 */  
-    m_Afs_f_Acs.vv.subtract(&point_Rfs_f_nRfs); // weil die Punkte so verschoben werden müssen, als lägen Rfs und Afs aufeinander.
+    m_Afs_f_Acs.vv.subtract(&point_Rfs_f_nRfs); // weil die Punkte so verschoben werden mssen, als lgen Rfs und Afs aufeinander.
 }
 
 void IVP_Constraint_Local::change_target_fixing_point_Ros(const IVP_U_Point *anchor) { // point_Ros_f_nRfs

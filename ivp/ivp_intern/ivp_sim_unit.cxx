@@ -2,8 +2,10 @@
 
 #include <ivp_physics.hxx>
 
-#if !defined(WIN32) && !defined(PSXII) && !defined(GEKKO) && !defined(PLATFORM_BSD)
+#if !defined(WIN32) && !defined(PSXII) && !defined(GEKKO) && !defined(PLATFORM_BSD) && !defined(__OpenBSD__) && !defined(PLATFORM_OPENBSD) && !defined(__FreeBSD__) && !defined(OSX)
 #	include <alloca.h>
+#else
+#	include <stdlib.h>
 #endif
 
 #ifndef WIN32

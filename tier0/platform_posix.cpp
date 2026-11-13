@@ -455,7 +455,13 @@ bool Plat_IsInDebugSession()
 	int mib[6] = { CTL_KERN, KERN_PROC, KERN_PROC_PID, getpid(), (int)sizeof(info), 1 };
 	if (sysctl(mib, 6, &info, &size, NULL, 0) == 0)
 	{
+#if defined(PS_TRACED)
+		return (info.p_psflags & PS_TRACED) != 0;
+#elif defined(P_TRACED)
 		return (info.p_flag & P_TRACED) != 0;
+#else
+		return false;
+#endif
 	}
 	return false;
 #elif defined(__NetBSD__)
@@ -770,9 +776,9 @@ PLATFORM_INTERFACE void Plat_SetWatchdogHandlerFunction( Plat_WatchDogHandlerFun
 // memory logging this functionality is portable code, except for the way in which it hooks
 // malloc/free. glibc contains the ability for the app to install hooks into malloc/free.
 
-#ifdef OSX
+#if defined(OSX)
 #include <malloc/malloc.h>
-#elif defined(PLATFORM_BSD)
+#elif defined(PLATFORM_BSD) || defined(__OpenBSD__) || defined(PLATFORM_OPENBSD) || defined(__FreeBSD__) || defined(__NetBSD__)
 #include <stdlib.h>
 #else
 #include <malloc.h>

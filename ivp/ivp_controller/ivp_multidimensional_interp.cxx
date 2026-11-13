@@ -2,7 +2,11 @@
 #include <ivp_physics.hxx>
 
 #if defined(LINUX)||defined(SUN)||(__MWERKS__ && __POWERPC__)
-#   include <alloca.h>
+#   if defined(PLATFORM_BSD) || defined(__OpenBSD__) || defined(PLATFORM_OPENBSD) || defined(__FreeBSD__) || defined(__NetBSD__) || defined(OSX)
+#       include <stdlib.h>
+#   else
+#       include <alloca.h>
+#   endif
 #endif
 
 

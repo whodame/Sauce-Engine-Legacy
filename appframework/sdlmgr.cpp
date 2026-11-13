@@ -36,7 +36,7 @@
 #define GLMPRINTF(args)
 #endif
 
-#if defined( OSX ) || defined( ANDROID )
+#if defined( OSX ) || defined( ANDROID ) || defined( LINUX ) || defined( PLATFORM_BSD )
 ConVar rawinput_set_one_time( "rawinput_set_one_time", "0", FCVAR_ARCHIVE|FCVAR_HIDDEN, "");
 #endif
 
@@ -1169,7 +1169,11 @@ void CSDLMgr::OnFrameRendered()
 				bWindowGrab = SDL_FALSE;
 
 			const char *pszVideoDriver = SDL_GetCurrentVideoDriver();
-			bool bIsWayland = m_bWaylandOnly || ( pszVideoDriver && V_stricmp( pszVideoDriver, "wayland" ) == 0 );
+#if defined( WAYLAND_ONLY ) || defined( SOURCE_WAYLAND_ONLY )
+			bool bIsWayland = true;
+#else
+			bool bIsWayland = ( pszVideoDriver && V_stricmp( pszVideoDriver, "wayland" ) == 0 );
+#endif
 			if ( !bIsWayland )
 				bRelativeMouseMode = SDL_FALSE;
 		}

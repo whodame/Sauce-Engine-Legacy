@@ -26,8 +26,10 @@
 #include <assert.h>
 #include <stdio.h>
 #include <stdarg.h>
-#ifdef OSX
+#if defined(OSX)
 #include <malloc/malloc.h>
+#elif defined(PLATFORM_BSD) || defined(__OpenBSD__) || defined(PLATFORM_OPENBSD) || defined(__FreeBSD__) || defined(__NetBSD__)
+#include <stdlib.h>
 #else
 #include <malloc.h>
 #endif

@@ -490,12 +490,10 @@ protected:
 		// last param lets us send NULL data ptr (only legal with uncompressed formats, beware)
 		// this helps out ResetSRGB.
 
-#if defined( OSX )
 	void					HandleSRGBMismatch( bool srgb, int &srgbFlipCount );
 	void					ResetSRGB( bool srgb, bool noDataWrite );
 	// re-specify texture format to match desired sRGB form
 	// noWrite means send NULL for texel source addresses instead of actual data - ideal for RT's
-#endif
 				
 	bool					IsRBODirty() const;
 	void					ForceRBONonDirty();

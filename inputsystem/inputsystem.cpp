@@ -75,6 +75,7 @@ CInputSystem::CInputSystem()
 	m_uiMouseWheel = 0;
 	m_bXController = false;
 	m_bRawInputSupported = false;
+	m_mouseRawAccumX = m_mouseRawAccumY = 0;
 	m_bSteamController = false;
 	m_bSteamControllerActionsInitialized = false;
 	m_bSteamControllerActive = false;
@@ -209,7 +210,7 @@ InitReturnVal_t CInputSystem::Init()
 	// Check if this version of windows supports raw mouse input (later than win2k)
 	m_bRawInputSupported = false;
 
-	CSysModule *m_pRawInputDLL = Sys_LoadModule( "USER32.dll" );
+	m_pRawInputDLL = Sys_LoadModule( "USER32.dll" );
 	if ( m_pRawInputDLL )
 	{
 		pfnRegisterRawInputDevices = (RegisterRawInputDevices_t)GetProcAddress( (HMODULE)m_pRawInputDLL, "RegisterRawInputDevices" );
@@ -1461,17 +1462,17 @@ LRESULT CInputSystem::WindowProc( HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lP
 		{
 			if ( m_bRawInputSupported )
 			{
-				UINT dwSize = 40;
-				static BYTE lpb[40];
+				UINT dwSize = sizeof( RAWINPUT );
+				RAWINPUT raw;
 
-				pfnGetRawInputData((HRAWINPUT)lParam, RID_INPUT, lpb, &dwSize, sizeof(RAWINPUTHEADER));
-
-				RAWINPUT* raw = (RAWINPUT*)lpb;
-				if (raw->header.dwType == RIM_TYPEMOUSE) 
+				if ( pfnGetRawInputData( (HRAWINPUT)lParam, RID_INPUT, &raw, &dwSize, sizeof(RAWINPUTHEADER) ) != (UINT)-1 )
 				{
-					m_mouseRawAccumX += raw->data.mouse.lLastX;
-					m_mouseRawAccumY += raw->data.mouse.lLastY;
-				} 
+					if ( raw.header.dwType == RIM_TYPEMOUSE ) 
+					{
+						m_mouseRawAccumX += raw.data.mouse.lLastX;
+						m_mouseRawAccumY += raw.data.mouse.lLastY;
+					}
+				}
 			}
 		}
 		break;

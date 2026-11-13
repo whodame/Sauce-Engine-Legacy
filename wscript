@@ -286,6 +286,7 @@ def define_platform(conf):
 			'PLATFORM_BSD=1',
 			'_DLL_EXT=.so'
 		]
+		conf.env.append_unique('INCLUDES', [os.path.abspath('.') + '/public/bsd_compat'])
 		if conf.env.DEST_OS == 'openbsd':
 			defs.append('PLATFORM_OPENBSD=1')
 			defs.append('OPENBSD=1')

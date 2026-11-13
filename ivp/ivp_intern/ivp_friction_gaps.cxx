@@ -14,8 +14,10 @@
 #include <ivp_friction_solver.hxx>
 #include <ivp_debug_manager.hxx> // bvecause of debug psi_synchrone
 
-#if !defined(WIN32) && !defined(PSXII) && !defined(GEKKO) && !defined(PLATFORM_BSD)
+#if !defined(WIN32) && !defined(PSXII) && !defined(GEKKO) && !defined(PLATFORM_BSD) && !defined(__OpenBSD__) && !defined(PLATFORM_OPENBSD) && !defined(__FreeBSD__) && !defined(OSX)
 #	include <alloca.h>
+#else
+#	include <stdlib.h>
 #endif
 
 inline IVP_DOUBLE ivp_frs_min(IVP_DOUBLE a,IVP_DOUBLE b){
