@@ -866,7 +866,7 @@ void FileOpenDialog::OnOpenInExplorer()
 	char szCmd[ MAX_PATH * 2];
 	Q_snprintf( szCmd, sizeof(szCmd), "/usr/bin/open \"%s\"", pCurrentDirectory );
 	::system( szCmd );
-#elif defined( LINUX )
+#elif defined( LINUX ) || defined( PLATFORM_BSD )
 	char szCmd[ MAX_PATH * 2 ];	
 	Q_snprintf( szCmd, sizeof(szCmd), "xdg-open \"%s\" &", pCurrentDirectory );
 	::system( szCmd );

@@ -1,7 +1,7 @@
 #ifndef HK_BASE_BASE_TYPES_H
 #define HK_BASE_BASE_TYPES_H
 
-#ifdef _LINUX
+#if defined(_LINUX) || defined(PLATFORM_BSD)
 #include <signal.h>
 #endif
 
@@ -35,7 +35,7 @@
 
 #define HK_DECLARE_NONVIRTUAL_CLASS_ALLOCATOR(a,b)
 
-#ifdef _LINUX
+#if defined(_LINUX) || defined(PLATFORM_BSD)
 #define HK_BREAKPOINT() raise(SIGINT)
 #else
 #define HK_BREAKPOINT() *(int*)0=0
@@ -73,7 +73,7 @@ typedef size_t 			hk_size_t;  // CK: unsigned long int ..
 typedef unsigned int 	hk_size_t;
 #endif
 
-#ifdef _LINUX
+#if defined(_LINUX) || defined(PLATFORM_BSD)
 #define HK_BREAK raise(SIGINT)
 #else
 #define HK_BREAK (*((int *)0)) = 0

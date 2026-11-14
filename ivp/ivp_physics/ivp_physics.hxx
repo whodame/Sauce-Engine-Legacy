@@ -19,7 +19,7 @@
 #include <stdio.h>
 
 #include <math.h>
-#if defined(LINUX)
+#if defined(LINUX) || defined(PLATFORM_BSD) || defined(POSIX)
 #	include <string.h>
 #endif
 

@@ -287,7 +287,7 @@ char *p_make_string(const char *templat, ...)
     va_list parg;
     memset(buffer,0,P_MIN(1000, MAX_MAKE_STRING_LEN)); // only for sparc-debugging
     va_start(parg,templat);
-#ifdef LINUX
+#if defined(LINUX) || defined(PLATFORM_BSD) || defined(POSIX)
     vsnprintf(buffer,MAX_MAKE_STRING_LEN,templat,parg);
 #else
     vsprintf(buffer, templat,parg);
@@ -310,7 +310,7 @@ IVP_ERROR_STRING p_export_error(const char *templat, ...)
     p += strlen(p);
     
     va_start(parg,templat);	
-#ifdef LINUX
+#if defined(LINUX) || defined(PLATFORM_BSD) || defined(POSIX)
     vsnprintf(buffer,MAX_MAKE_STRING_LEN,templat,parg);
 #else
     vsprintf(buffer, templat,parg);
@@ -333,7 +333,7 @@ void ivp_message(const char *templat, ...)
     p += strlen(p);
     
     va_start(parg,templat);	
-#ifdef LINUX
+#if defined(LINUX) || defined(PLATFORM_BSD) || defined(POSIX)
     vsnprintf(buffer,MAX_MAKE_STRING_LEN,templat,parg);
 #else
     vsprintf(buffer, templat,parg);

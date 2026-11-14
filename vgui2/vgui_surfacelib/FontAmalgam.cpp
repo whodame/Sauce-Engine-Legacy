@@ -79,7 +79,7 @@ font_t *CFontAmalgam::GetFontForChar(int ch)
 {
 	for (int i = 0; i < m_Fonts.Count(); i++)
 	{
-#if defined(LINUX)
+#if defined(LINUX) || defined(PLATFORM_BSD)
         if ( ch >= m_Fonts[i].lowRange && ch <= m_Fonts[i].highRange && m_Fonts[i].font->HasChar(ch))
 #else
 		if (ch >= m_Fonts[i].lowRange && ch <= m_Fonts[i].highRange)

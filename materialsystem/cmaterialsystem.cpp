@@ -1637,7 +1637,7 @@ void CMaterialSystem::GenerateConfigFromConfigKeyValues( MaterialSystem_Config_t
 
 	pConfig->m_Flags = 0;
 
-#ifdef LINUX
+#if defined(LINUX) || defined(PLATFORM_BSD)
 
 	uint width = 0;
 	uint height = 0;

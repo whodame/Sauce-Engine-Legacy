@@ -1092,11 +1092,11 @@ FSReturnCode_t FileSystem_GetFileSystemDLLName( char *pFileSystemDLL, int nMaxLe
 	#if !defined( _X360 )
 
 		// Use filsystem_steam if it exists?
-		#if defined( OSX ) || defined( LINUX )
+		#if defined( OSX ) || defined( LINUX ) || defined( PLATFORM_BSD )
 			struct stat statBuf;
 		#endif
 		if (
-			#if defined( OSX ) || defined( LINUX )
+			#if defined( OSX ) || defined( LINUX ) || defined( PLATFORM_BSD )
 				stat( pFileSystemDLL, &statBuf ) != 0
 			#else
 				_access( pFileSystemDLL, 0 ) != 0
@@ -1116,11 +1116,11 @@ FSReturnCode_t FileSystem_GetFileSystemDLLName( char *pFileSystemDLL, int nMaxLe
 
 	#if !defined( _X360 )
 		// Use filsystem_steam if it exists?
-		#if defined( OSX ) || defined( LINUX )
+		#if defined( OSX ) || defined( LINUX ) || defined( PLATFORM_BSD )
 			struct stat statBuf;
 		#endif
 		if (
-			#if defined( OSX ) || defined( LINUX )
+			#if defined( OSX ) || defined( LINUX ) || defined( PLATFORM_BSD )
 				stat( pFileSystemDLL, &statBuf ) != 0
 			#else
 				_access( pFileSystemDLL, 0 ) != 0

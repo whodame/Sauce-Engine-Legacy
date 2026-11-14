@@ -5,7 +5,7 @@
 #ifndef _IVP_U_TYPES_INCLUDED
 #define _IVP_U_TYPES_INCLUDED
 
-#ifdef _LINUX
+#if defined(_LINUX) || defined(PLATFORM_BSD)
 	#include <signal.h>
 #endif
 

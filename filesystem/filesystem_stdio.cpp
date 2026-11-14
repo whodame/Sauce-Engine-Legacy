@@ -17,7 +17,7 @@
 #include "tier0/tslist.h"
 #elif defined(POSIX)
 #include <fcntl.h>
-#ifdef LINUX
+#if defined(LINUX) || defined(PLATFORM_BSD) || defined(__OpenBSD__)
 #include <sys/file.h>
 #endif
 #endif
@@ -974,7 +974,7 @@ void CStdioFile::FS_fclose()
 		AUTO_LOCK( m_MutexLockedFD );
 
 		struct _stat buf;
-#ifdef ANDROID
+#if defined( ANDROID ) || defined( PLATFORM_BSD ) || defined( __OpenBSD__ )
 		int fd = fileno( m_pFile ); // need to test this
 #else
 		int fd = fileno_unlocked( m_pFile );
