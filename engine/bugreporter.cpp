@@ -352,6 +352,8 @@ void DisplaySystemVersion( char *osversion, int maxlen )
 #elif PLATFORM_BSD
   #ifdef __FreeBSD__
     osversion = (char *)"FreeBSD";
+  #elif defined(__OpenBSD__)
+    osversion = (char *)"OpenBSD";
   #else
     osversion = (char *)"*BSD";
   #endif

@@ -290,7 +290,15 @@ inline void *valve_calloc_check_oom( size_t num, size_t size )
 
 inline void *valve_memalign_check_oom( size_t alignment, size_t size )
 {
+#if defined( __OpenBSD__ ) || defined( PLATFORM_OPENBSD ) || defined( PLATFORM_BSD )
+	void *ptr = NULL;
+	if ( alignment < sizeof( void * ) )
+		alignment = sizeof( void * );
+	if ( posix_memalign( &ptr, alignment, size ) != 0 )
+		ptr = NULL;
+#else
 	void *ptr = memalign( alignment, size );
+#endif
 	if (!ptr)
 		MemAllocOOMError(size);
 	return ptr;

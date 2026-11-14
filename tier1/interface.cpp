@@ -247,7 +247,7 @@ HMODULE Sys_LoadLibrary( const char *pLibraryName, Sys_Flags flags )
 #elif POSIX
 	int dlopen_mode = RTLD_NOW;
 
-#ifndef ANDROID
+#if !defined(ANDROID) && defined(RTLD_NOLOAD)
 	if ( flags & SYS_NOLOAD )
 		dlopen_mode |= RTLD_NOLOAD;
 #endif

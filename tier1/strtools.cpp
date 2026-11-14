@@ -2947,13 +2947,84 @@ size_t Q_URLDecodeRaw( char *pchDecodeDest, int nDecodeDestLen, const char *pchE
 	return Q_URLDecodeInternal( pchDecodeDest, nDecodeDestLen, pchEncodedSource, nEncodedSourceLen, false );
 }
 
+#if defined(__OpenBSD__) || defined(PLATFORM_OPENBSD)
+static void OpenBSD_SwapBytes( unsigned char *a, unsigned char *b, size_t width )
+{
+	if ( a == b )
+		return;
+	while ( width-- )
+	{
+		unsigned char tmp = *a;
+		*a++ = *b;
+		*b++ = tmp;
+	}
+}
+
+static void OpenBSD_QSortImpl( unsigned char *base, size_t lo, size_t hi, size_t width,
+	int ( __cdecl *compare )(void *, const void *, const void *), void *context )
+{
+	while ( lo < hi )
+	{
+		if ( hi - lo < 16 )
+		{
+			for ( size_t i = lo + 1; i <= hi; ++i )
+			{
+				for ( size_t j = i; j > lo && compare( context, base + j * width, base + ( j - 1 ) * width ) < 0; --j )
+				{
+					OpenBSD_SwapBytes( base + j * width, base + ( j - 1 ) * width, width );
+				}
+			}
+			return;
+		}
+
+		size_t mid = lo + ( hi - lo ) / 2;
+		if ( compare( context, base + mid * width, base + lo * width ) < 0 )
+			OpenBSD_SwapBytes( base + mid * width, base + lo * width, width );
+		if ( compare( context, base + hi * width, base + lo * width ) < 0 )
+			OpenBSD_SwapBytes( base + hi * width, base + lo * width, width );
+		if ( compare( context, base + mid * width, base + hi * width ) < 0 )
+			OpenBSD_SwapBytes( base + mid * width, base + hi * width, width );
+
+		unsigned char *pivot = base + hi * width;
+		size_t i = lo;
+		for ( size_t j = lo; j < hi; ++j )
+		{
+			if ( compare( context, base + j * width, pivot ) < 0 )
+			{
+				OpenBSD_SwapBytes( base + i * width, base + j * width, width );
+				++i;
+			}
+		}
+		OpenBSD_SwapBytes( base + i * width, base + hi * width, width );
+
+		if ( i - lo < hi - i )
+		{
+			if ( i > lo )
+				OpenBSD_QSortImpl( base, lo, i - 1, width, compare, context );
+			lo = i + 1;
+		}
+		else
+		{
+			if ( i + 1 < hi )
+				OpenBSD_QSortImpl( base, i + 1, hi, width, compare, context );
+			if ( i == 0 )
+				return;
+			hi = i - 1;
+		}
+	}
+}
+#endif
+
 #if defined( LINUX ) || defined( _PS3 )
 extern "C" void qsort_s( void *base, size_t num, size_t width, int (*compare )(void *, const void *, const void *), void * context );
 #endif
 
 void V_qsort_s( void *base, size_t num, size_t width, int ( __cdecl *compare )(void *, const void *, const void *), void * context ) 
 {
-#if defined(OSX) || defined(PLATFORM_BSD)
+#if defined(__OpenBSD__) || defined(PLATFORM_OPENBSD)
+	if ( base && num > 1 && width > 0 && compare )
+		OpenBSD_QSortImpl( (unsigned char *)base, 0, num - 1, width, compare, context );
+#elif defined(OSX) || defined(PLATFORM_BSD)
 	// the arguments are swapped 'round on the mac - awesome, huh?
 	return qsort_r( base, num, width, context, compare );
 #else
