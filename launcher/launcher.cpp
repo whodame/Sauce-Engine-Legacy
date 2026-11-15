@@ -1233,8 +1233,20 @@ DLL_EXPORT int LauncherMain( int argc, char **argv )
 
 #if (defined LINUX || defined PLATFORM_BSD) && defined USE_SDL
 #if defined(WAYLAND_ONLY) || defined(SOURCE_WAYLAND_ONLY)
-	setenv("SDL_VIDEODRIVER", "wayland", 1);
-	SDL_SetHint(SDL_HINT_VIDEODRIVER, "wayland");
+	bool bHasWaylandDriver = false;
+	for ( int i = 0; i < SDL_GetNumVideoDrivers(); ++i )
+	{
+		if ( SDL_GetVideoDriver( i ) && V_stricmp( SDL_GetVideoDriver( i ), "wayland" ) == 0 )
+		{
+			bHasWaylandDriver = true;
+			break;
+		}
+	}
+	if ( bHasWaylandDriver && getenv( "WAYLAND_DISPLAY" ) != NULL )
+	{
+		setenv( "SDL_VIDEODRIVER", "wayland", 0 );
+		SDL_SetHint( SDL_HINT_VIDEODRIVER, "wayland" );
+	}
 #endif
 #if defined(USE_MESA) || defined(USE_MESA_ZINK)
 	setenv("MESA_LOADER_DRIVER_OVERRIDE", "zink", 0);

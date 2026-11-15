@@ -516,7 +516,14 @@ InitReturnVal_t CSDLMgr::Init()
 	if (!SDL_WasInit(SDL_INIT_VIDEO))
 	{
 		if (SDL_Init(SDL_INIT_VIDEO) == -1)
-			Error( "SDL_Init(SDL_INIT_VIDEO) failed: %s", SDL_GetError() );
+		{
+#ifndef _WIN32
+			unsetenv("SDL_VIDEODRIVER");
+#endif
+			SDL_SetHintWithPriority(SDL_HINT_VIDEODRIVER, NULL, SDL_HINT_OVERRIDE);
+			if (SDL_Init(SDL_INIT_VIDEO) == -1)
+				Error( "SDL_Init(SDL_INIT_VIDEO) failed: %s", SDL_GetError() );
+		}
 
 #if defined( DX_TO_GL_ABSTRACTION )
 		if ( CommandLine()->FindParm( "-gl_debug" ) )
@@ -1169,11 +1176,7 @@ void CSDLMgr::OnFrameRendered()
 				bWindowGrab = SDL_FALSE;
 
 			const char *pszVideoDriver = SDL_GetCurrentVideoDriver();
-#if defined( WAYLAND_ONLY ) || defined( SOURCE_WAYLAND_ONLY )
-			bool bIsWayland = true;
-#else
 			bool bIsWayland = ( pszVideoDriver && V_stricmp( pszVideoDriver, "wayland" ) == 0 );
-#endif
 			if ( !bIsWayland )
 				bRelativeMouseMode = SDL_FALSE;
 		}

@@ -438,6 +438,10 @@ def check_deps(conf):
 		conf.env.FRAMEWORK_COREAUDIO = "CoreAudio"
 		conf.env.FRAMEWORK_AUDIOTOOLBOX = "AudioToolbox"
 		conf.env.FRAMEWORK_SYSTEMCONFIGURATION = "SystemConfiguration"
+	elif conf.env.DEST_OS in ['freebsd', 'openbsd', 'netbsd', 'dragonflybsd']:
+		conf.check_cc(lib='iconv', uselib_store='ICONV', mandatory=False)
+		conf.env.append_unique('LINKFLAGS', ['-liconv'])
+		conf.env.append_unique('LIB', ['iconv'])
 
 	if conf.options.TESTS:
 		return
@@ -625,10 +629,13 @@ def configure(conf):
 	if conf.env.DEST_CPU in [ 'arm', 'thumb' ]:
 		flags += ['-march=armv7-a', '-mfpu=neon-vfpv4']
 
-	if conf.env.DEST_OS in ['freebsd', 'openbsd']:
-		linkflags += ['-lexecinfo']
+	if conf.env.DEST_OS in ['freebsd', 'openbsd', 'netbsd', 'dragonflybsd']:
+		linkflags += ['-lexecinfo', '-liconv']
+		conf.env.append_unique('LIB', ['execinfo', 'iconv'])
 		if conf.env.DEST_OS == 'openbsd':
 			linkflags += ['-lsndio', '-Wl,-z,wxneeded']
+			conf.env.append_unique('LIB', ['sndio'])
+			conf.env.RPATH += ['/usr/local/lib', '/usr/X11R6/lib']
 
 	if conf.options.WAYLAND_ONLY:
 		conf.define('WAYLAND_ONLY', 1)
