@@ -520,7 +520,9 @@ InitReturnVal_t CSDLMgr::Init()
 #ifndef _WIN32
 			unsetenv("SDL_VIDEODRIVER");
 #endif
+#ifdef SDL_HINT_VIDEODRIVER
 			SDL_SetHintWithPriority(SDL_HINT_VIDEODRIVER, NULL, SDL_HINT_OVERRIDE);
+#endif
 			if (SDL_Init(SDL_INIT_VIDEO) == -1)
 				Error( "SDL_Init(SDL_INIT_VIDEO) failed: %s", SDL_GetError() );
 		}

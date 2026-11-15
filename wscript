@@ -188,7 +188,7 @@ def define_platform(conf):
 	conf.env.TOGLES = conf.options.TOGLES
 	conf.env.DXVK = conf.options.DXVK and not conf.options.TESTS and not conf.options.DEDICATED
 	# DXVK-native replaces ToGL: the engine uses its real D3D9 path, DXVK translates D3D9 to Vulkan
-	conf.env.GL = conf.options.GL and not conf.env.DXVK and not conf.options.TESTS and not conf.options.DEDICATED
+	conf.env.GL = (conf.options.GL or conf.env.TOGLES or conf.env.DEST_OS != 'win32') and not conf.env.DXVK and not conf.options.TESTS and not conf.options.DEDICATED
 	conf.env.OPUS = conf.options.OPUS
 
 	arch32 = conf.run_test(CPP_32BIT_CHECK, 'Testing 32bit support')
@@ -211,16 +211,13 @@ def define_platform(conf):
 			'BINK_VIDEO'
 		])
 
-	if conf.options.TOGLES:
+	if conf.env.TOGLES:
 		conf.env.append_unique('DEFINES', ['TOGLES'])
 
 	if conf.env.DXVK:
 		conf.env.append_unique('DEFINES', ['DXVK'])
 
-	if conf.options.TESTS:
-		conf.define('UNITTESTS', 1)
-
-	if conf.options.SDL and not conf.options.TESTS:
+	if (conf.options.SDL or (conf.env.DEST_OS != 'win32' and not conf.options.DEDICATED)) and not conf.options.TESTS:
 		conf.env.SDL = 1
 		conf.define('USE_SDL', 1)
 
@@ -448,7 +445,7 @@ def check_deps(conf):
 
 	if conf.env.DEST_OS != 'android':
 		if conf.env.DEST_OS != 'win32':
-			if conf.options.SDL:
+			if conf.env.SDL:
 				conf.check_cfg(package='sdl2', uselib_store='SDL2', args=['--cflags', '--libs'])
 			if conf.options.DEDICATED:
 				conf.check_cfg(package='libedit', uselib_store='EDIT', args=['--cflags', '--libs'])
@@ -482,11 +479,10 @@ def check_deps(conf):
 		conf.check(lib='curl', uselib_store='CURL', define_name='HAVE_CURL')
 		conf.check(lib='z', uselib_store='ZLIB', define_name='HAVE_ZLIB')
 		if conf.env.DEST_CPU != 'aarch64':
-			conf.check(lib='unwind', uselib_store='UNWIND', mandatory=not (getattr(conf, 'android', None) and conf.android.ndk_rev >= 21))
+			conf.check(lib='unwind', uselib_store='UNWIND')
 			conf.check(lib='crypto', uselib_store='CRYPTO')
 			conf.check(lib='ssl', uselib_store='SSL')
-		if not getattr(conf, 'android', None) or conf.android.ndk_rev < 21:
-			conf.check(lib='android_support', uselib_store='ANDROID_SUPPORT', mandatory=False)
+		conf.check(lib='android_support', uselib_store='ANDROID_SUPPORT')
 		conf.check(lib='opus', uselib_store='OPUS')
 
 	if conf.env.DEST_OS == 'win32':
@@ -523,7 +519,7 @@ def configure(conf):
 	else:
 		conf.env.MSVC_SUBSYSTEM = 'WINDOWS'
 
-	if sys.platform == 'win32':
+	if sys.platform == 'win32' and not conf.options.ANDROID_OPTS:
 		conf.load('msvc_pdb_ext msdev msvs msvcdeps')
 	conf.load('subproject xcompile compiler_c compiler_cxx gccdeps gitversion clang_compilation_database strip_on_install_v2 waf_unit_test enforce_pic')
 	if conf.env.DEST_OS == 'win32' and conf.env.DEST_CPU == 'amd64':
@@ -605,6 +601,7 @@ def configure(conf):
 	if conf.env.DEST_OS == 'android':
 		flags += [
 			'-L'+os.path.abspath('.')+'/lib/android/'+conf.env.DEST_CPU+'/',
+			'-idirafter'+os.path.abspath('.')+'/thirdparty',
 			'-I'+os.path.abspath('.')+'/thirdparty/curl/include',
 			'-I'+os.path.abspath('.')+'/thirdparty/SDL',
 			'-I'+os.path.abspath('.')+'/thirdparty/openal-soft/include/',

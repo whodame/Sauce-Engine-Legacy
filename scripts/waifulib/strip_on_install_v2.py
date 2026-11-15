@@ -30,15 +30,17 @@ def configure(conf):
 		# a1ba: I am lazy to add `export OBJCOPY=` everywhere in my scripts
 		# so just try to deduce which objcopy we have
 		try:
-			k = conf.env.STRIP[0].rfind('-')
+			strip_exe = conf.env.STRIP[0]
+			k = strip_exe.rfind('-')
 			if k >= 0:
-				objcopy_name = conf.env.STRIP[0][:k] + '-objcopy'
+				ext = os.path.splitext(strip_exe)[1]
+				objcopy_name = strip_exe[:k] + '-objcopy' + ext
 				try: conf.find_program(objcopy_name, var='OBJCOPY')
-				except: conf.find_program('objcopy', var='OBJCOPY')
+				except: conf.find_program('objcopy', var='OBJCOPY', mandatory=False)
 			else:
-				conf.find_program('objcopy', var='OBJCOPY')
+				conf.find_program('objcopy', var='OBJCOPY', mandatory=False)
 		except:
-			conf.find_program('objcopy', var='OBJCOPY')
+			conf.find_program('objcopy', var='OBJCOPY', mandatory=False)
 
 def copy_fun(self, src, tgt):
 	inst_copy_fun(self, src, tgt)

@@ -212,6 +212,10 @@ class Android:
 		exe = self.gen_toolchain_path() + ('clang' if self.is_clang() else 'gcc')
 		if sys.platform.startswith('win32') and os.path.exists(exe + '.cmd'):
 			return exe + '.cmd'
+		if sys.platform.startswith('win32') and self.is_clang():
+			clang_exe = os.path.join(self.gen_gcc_toolchain_path(), 'bin', 'clang.exe')
+			if os.path.exists(clang_exe):
+				return clang_exe
 		return exe
 
 	def cxx(self):
@@ -220,6 +224,10 @@ class Android:
 		exe = self.gen_toolchain_path() + ('clang++' if self.is_clang() else 'g++')
 		if sys.platform.startswith('win32') and os.path.exists(exe + '.cmd'):
 			return exe + '.cmd'
+		if sys.platform.startswith('win32') and self.is_clang():
+			clangxx_exe = os.path.join(self.gen_gcc_toolchain_path(), 'bin', 'clang++.exe')
+			if os.path.exists(clangxx_exe):
+				return clangxx_exe
 		return exe
 
 	def strip(self):
@@ -266,6 +274,9 @@ class Android:
 
 	def cflags(self, cxx = False):
 		cflags = []
+
+		if sys.platform.startswith('win32') and self.is_clang() and not self.is_host():
+			cflags += ['--target=%s%d' % (self.ndk_triplet(llvm_toolchain = True), self.api)]
 
 		if self.ndk_rev <= ANDROID_NDK_SYSROOT_FLAG_MAX:
 			cflags += ['--sysroot=%s' % (self.sysroot())]
@@ -315,6 +326,8 @@ class Android:
 	# they go before object list
 	def linkflags(self):
 		linkflags = []
+		if sys.platform.startswith('win32') and self.is_clang() and not self.is_host():
+			linkflags += ['--target=%s%d' % (self.ndk_triplet(llvm_toolchain = True), self.api)]
 		if self.is_host():
 			linkflags += ['--gcc-toolchain=%s' % self.gen_gcc_toolchain_path()]
 
@@ -375,6 +388,12 @@ def configure(conf):
 		if values[0] == 'aarch64': stlarch = 'arm64-v8a'
 
 		conf.android = android = Android(conf, values[0], values[1], int(values[2]))
+		if android.is_clang():
+			conf.options.check_c_compiler = 'clang'
+			conf.options.check_cxx_compiler = 'clang++'
+		else:
+			conf.options.check_c_compiler = 'gcc'
+			conf.options.check_cxx_compiler = 'g++'
 		conf.environ['CC'] = android.cc()
 		conf.environ['CXX'] = android.cxx()
 		conf.environ['STRIP'] = android.strip()

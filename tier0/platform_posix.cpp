@@ -1183,6 +1183,39 @@ void DumpMemorySummary( void )
 
 #endif // !NO_HOOK_MALLOC
 
+#if defined(__ANDROID__) && defined(__arm__) && defined(__clang__)
+// Prebuilt ARMv7 static third-party libraries (e.g. libcrypto.a, libunwind.a) compiled with legacy
+// GCC emit calls to out-of-line __sync_* libgcc helpers that were removed in newer NDKs (r23-r30+).
+extern "C" {
+__attribute__((visibility("default"), used)) void _sauce_sync_synchronize(void) {
+	__atomic_thread_fence(__ATOMIC_SEQ_CST);
+}
+__attribute__((visibility("default"), used)) int _sauce_sync_add_and_fetch_4(volatile int *ptr, int val) {
+	return __atomic_add_fetch(ptr, val, __ATOMIC_SEQ_CST);
+}
+__attribute__((visibility("default"), used)) int _sauce_sync_fetch_and_add_4(volatile int *ptr, int val) {
+	return __atomic_fetch_add(ptr, val, __ATOMIC_SEQ_CST);
+}
+__attribute__((visibility("default"), used)) int _sauce_sync_fetch_and_sub_4(volatile int *ptr, int val) {
+	return __atomic_fetch_sub(ptr, val, __ATOMIC_SEQ_CST);
+}
+}
+__asm__(
+	".globl __sync_synchronize\n"
+	".type __sync_synchronize, %function\n"
+	".set __sync_synchronize, _sauce_sync_synchronize\n"
+	".globl __sync_add_and_fetch_4\n"
+	".type __sync_add_and_fetch_4, %function\n"
+	".set __sync_add_and_fetch_4, _sauce_sync_add_and_fetch_4\n"
+	".globl __sync_fetch_and_add_4\n"
+	".type __sync_fetch_and_add_4, %function\n"
+	".set __sync_fetch_and_add_4, _sauce_sync_fetch_and_add_4\n"
+	".globl __sync_fetch_and_sub_4\n"
+	".type __sync_fetch_and_sub_4, %function\n"
+	".set __sync_fetch_and_sub_4, _sauce_sync_fetch_and_sub_4\n"
+);
+#endif
+
 // Turn off memdbg macros (turned on up top) since this is included like a header
 #include "tier0/memdbgoff.h"
 

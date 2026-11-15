@@ -4016,8 +4016,6 @@ void CGLMTex::Unlock( GLMTexLockParams *params )
 	}
 }
 
-#if defined( OSX )
-
 void CGLMTex::HandleSRGBMismatch( bool srgb, int &srgbFlipCount )
 {
 	bool srgbCapableTex = false; // not yet known
@@ -4216,7 +4214,6 @@ void CGLMTex::ResetSRGB( bool srgb, bool noDataWrite )
 		m_ctx->BindTexToTMU( tmu0save, 0 );
 	}
 }
-#endif
 
 bool CGLMTex::IsRBODirty() const 
 { 
