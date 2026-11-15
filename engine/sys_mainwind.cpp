@@ -1076,6 +1076,14 @@ bool CGame::CreateGameWindow( void )
 	SetMainWindow( (SDL_Window*)g_pLauncherMgr->GetWindowRef() );
 
 	AttachToWindow( );
+#if defined( ANDROID )
+	// Ensure initial foreground focus matches SDL window state so snd_mute_losefocus
+	// does not mute startup audio if focus events arrived prior to event pumping.
+	if ( m_pSDLWindow && ( SDL_GetWindowFlags( m_pSDLWindow ) & SDL_WINDOW_INPUT_FOCUS ) )
+	{
+		SetActiveApp( true );
+	}
+#endif
 	return true;
 #else
 #error

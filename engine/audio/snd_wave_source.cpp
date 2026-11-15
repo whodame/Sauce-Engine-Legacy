@@ -2378,9 +2378,9 @@ bool CAudioSourceCache::Init( unsigned int memSize )
 		return true;
 	}
 
-	// Gather up list of search paths
+	// Gather up list of search paths (including VPKs so prebuilt .vpk.sound.cache files are used)
 	CUtlVector< CUtlString > vecSearchPaths;
-	GetSearchPath( vecSearchPaths, "game" );
+	GetSearchPath( vecSearchPaths, "game", true );
 
 	// Create corresponding caches
 	FOR_EACH_VEC( vecSearchPaths, idxSearchPath )
@@ -2440,13 +2440,13 @@ CAudioSourceCache::SearchPathCache *CAudioSourceCache::CreateCacheForSearchPath(
 	UtlCachedFileDataType_t eOutOfDateMethod = UTL_CACHED_FILE_USE_FILESIZE;
 	char szCacheName[ MAX_PATH + 32 ];
 	V_strcpy_safe( szCacheName, szSearchPath );
-	char *dotVpkSlash = V_stristr( szCacheName, ".vpk" CORRECT_PATH_SEPARATOR_S );
-	if ( dotVpkSlash )
+	// VPK search paths end in ".vpk/", so their sound cache lives beside the VPK as "<name>.vpk.sound.cache"
+	const char szVpkSuffix[] = ".vpk" CORRECT_PATH_SEPARATOR_S;
+	const size_t nSuffixLen = sizeof( szVpkSuffix ) - 1;
+	const size_t nCacheNameLen = V_strlen( szCacheName );
+	if ( nCacheNameLen >= nSuffixLen && V_stricmp( szCacheName + nCacheNameLen - nSuffixLen, szVpkSuffix ) == 0 )
 	{
-		Assert( dotVpkSlash[5] == '\0' );
-		char *d = dotVpkSlash+4; // backup to where the slash is
-		Assert( *d == CORRECT_PATH_SEPARATOR );
-		V_strcpy( d, ".sound.cache" );
+		V_strcpy( szCacheName + nCacheNameLen - 1, ".sound.cache" );
 	}
 	else
 	{
@@ -2572,20 +2572,33 @@ CAudioSourceCache::SearchPathCache *CAudioSourceCache::LookUpCacheEntry( const c
 		return NULL;
 	}
 
-	// now try to figure out which search path this corresponds to
+	// Select the longest matching search path prefix so VPK or nested mod caches are
+	// not shadowed when a parent directory (e.g. hl2/) precedes them in SearchPaths.
+	SearchPathCache *pBestCache = NULL;
+	size_t bestLen = 0;
 	FOR_EACH_VEC( m_vecCaches, idx )
 	{
 		SearchPathCache *pCache = m_vecCaches[idx];
-		if ( V_strncmp( pCache->m_szSearchPath, szAbsFilename, V_strlen( pCache->m_szSearchPath ) ) == 0 )
+		size_t nLen = V_strlen( pCache->m_szSearchPath );
+		if ( nLen > bestLen &&
+#ifdef _WIN32
+			V_strnicmp( pCache->m_szSearchPath, szAbsFilename, nLen ) == 0
+#else
+			V_strncmp( pCache->m_szSearchPath, szAbsFilename, nLen ) == 0
+#endif
+		)
 		{
-			return pCache;
+			pBestCache = pCache;
+			bestLen = nLen;
 		}
+	}
+	if ( pBestCache )
+	{
+		return pBestCache;
 	}
 	Warning( "Cannot figure out which search path %s came from.  Absolute path is %s\n", szRelFilename, szAbsFilename );
 
-	SearchPathCache *pCache = NULL;
-
-	return pCache;
+	return NULL;
 }
 
 

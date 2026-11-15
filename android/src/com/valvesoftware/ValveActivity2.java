@@ -6,6 +6,7 @@ import android.content.DialogInterface;
 import android.content.Intent;
 import android.content.pm.PackageManager;
 import android.content.res.AssetManager;
+import android.media.AudioManager;
 import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
@@ -57,6 +58,7 @@ public class ValveActivity2 extends SDLActivity {
     protected void onCreate(Bundle savedInstanceState) {
         copyBundledFonts();
         super.onCreate(savedInstanceState);
+        setVolumeControlStream(AudioManager.STREAM_MUSIC);
 
         if (!mBrokenLibraries) {
             configureEngineEnvironment();

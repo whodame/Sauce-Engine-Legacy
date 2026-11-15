@@ -181,11 +181,14 @@ int UpdateOrCreate( const char *pSourceName, char *pTargetName, int targetLen, c
 //-----------------------------------------------------------------------------
 // Returns the search path as a list of paths
 //-----------------------------------------------------------------------------
-void GetSearchPath( CUtlVector< CUtlString > &path, const char *pPathID )
+void GetSearchPath( CUtlVector< CUtlString > &path, const char *pPathID, bool bGetPackFiles )
 {
-	int nMaxLen = g_pFullFileSystem->GetSearchPath( pPathID, false, NULL, 0 );
+	int nMaxLen = g_pFullFileSystem->GetSearchPath( pPathID, bGetPackFiles, NULL, 0 );
+	if ( nMaxLen <= 0 )
+		return;
+
 	char *pBuf = (char*)stackalloc( nMaxLen );
-	g_pFullFileSystem->GetSearchPath( pPathID, false, pBuf, nMaxLen );
+	g_pFullFileSystem->GetSearchPath( pPathID, bGetPackFiles, pBuf, nMaxLen );
 
 	char *pSemi;
 	while ( NULL != ( pSemi = strchr( pBuf, ';' ) ) )
@@ -194,7 +197,10 @@ void GetSearchPath( CUtlVector< CUtlString > &path, const char *pPathID )
 		path.AddToTail( pBuf );
 		pBuf = pSemi + 1;
 	}
-	path.AddToTail( pBuf );
+	if ( *pBuf )
+	{
+		path.AddToTail( pBuf );
+	}
 }
 
 //-----------------------------------------------------------------------------

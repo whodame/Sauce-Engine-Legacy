@@ -87,7 +87,7 @@ public:
 		switch( nWhence )
 		{
 			case SEEK_CUR:
-				nOffset = m_nFileOffset + nOffset ;
+				nOffset = m_nCurrentFileOffset + nOffset;
 				break;
 
 			case SEEK_END:

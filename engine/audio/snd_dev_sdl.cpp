@@ -115,6 +115,12 @@ static CAudioDeviceSDLAudio *g_wave = NULL;
 CAudioDeviceSDLAudio::CAudioDeviceSDLAudio()
 {
 	m_devId = 0;
+	m_deviceSampleCount = 0;
+	m_buffersSent = 0;
+	m_pauseCount = 0;
+	m_readPos = 0;
+	m_partialWrite = 0;
+	m_pBuffer = NULL;
 }
 
 //-----------------------------------------------------------------------------
@@ -219,21 +225,11 @@ void CAudioDeviceSDLAudio::OpenWaveOut( void )
 	// !!! FIXME: specify channel map, etc
 	// !!! FIXME: set properties (role, icon, etc).
 
-	//#define SDLAUDIO_FAIL(fnstr) do { DevWarning(fnstr " failed"); CloseWaveOut(); return; } while (false)
-	//#define SDLAUDIO_FAIL(fnstr) do { printf("SDLAUDIO: " fnstr " failed: %s\n", SDL_GetError ? SDL_GetError() : "???"); CloseWaveOut(); return; } while (false)
-	#define SDLAUDIO_FAIL(fnstr) do { const char *err = SDL_GetError(); printf("SDLAUDIO: " fnstr " failed: %s\n", err ? err : "???"); CloseWaveOut(); return; } while (false)
+	#define SDLAUDIO_FAIL(fnstr) do { const char *err = SDL_GetError(); Warning("SDLAUDIO: " fnstr " failed: %s\n", err ? err : "???"); CloseWaveOut(); return; } while (false)
 
-	if (!SDL_WasInit(SDL_INIT_AUDIO))
-	{
-		if (SDL_InitSubSystem(SDL_INIT_AUDIO))
-			SDLAUDIO_FAIL("SDL_InitSubSystem(SDL_INIT_AUDIO)");
-	}
-
-	debugsdl("SDLAUDIO: Using SDL audio target '%s'\n", SDL_GetCurrentAudioDriver());
-
-	// Open an audio device...
-	//  !!! FIXME: let user specify a device?
-	// !!! FIXME: we can handle quad, 5.1, 7.1, etc here.
+	// CAudioDeviceSDLAudio strictly produces SOUND_DMA_SPEED / AUDIO_S16SYS / 2ch PCM
+	// and copies directly in AudioCallback, so require SDL to convert/resample if the
+	// hardware backend differs (e.g. Android 48 kHz / float32).
 	SDL_AudioSpec desired, obtained;
 	memset(&desired, '\0', sizeof (desired));
 	desired.freq = SOUND_DMA_SPEED;
@@ -242,10 +238,75 @@ void CAudioDeviceSDLAudio::OpenWaveOut( void )
 	desired.samples = 2048;
 	desired.callback = &CAudioDeviceSDLAudio::AudioCallbackEntry;
 	desired.userdata = this;
-	m_devId = SDL_OpenAudioDevice(NULL, 0, &desired, &obtained, SDL_AUDIO_ALLOW_ANY_CHANGE);
+
+#ifdef ANDROID
+	// Prefer OpenSL ES, then Java AudioTrack ("android"), avoiding libSDL2's AAudio
+	// backend whose 1 ms non-waiting write loop drops/silences frames unless overridden.
+	const char *pszUserDriver = getenv("SDL_AUDIODRIVER");
+	const char *candidates[4];
+	int numCandidates = 0;
+	if (pszUserDriver && pszUserDriver[0])
+	{
+		candidates[numCandidates++] = pszUserDriver;
+	}
+	else
+	{
+		candidates[numCandidates++] = "openslES";
+		candidates[numCandidates++] = "android";
+		candidates[numCandidates++] = NULL;
+	}
+
+	for (int i = 0; i < numCandidates && !m_devId; ++i)
+	{
+		if (SDL_WasInit(SDL_INIT_AUDIO))
+		{
+			SDL_QuitSubSystem(SDL_INIT_AUDIO);
+		}
+		if (candidates[i])
+		{
+			setenv("SDL_AUDIODRIVER", candidates[i], 1);
+		}
+		else if (!pszUserDriver)
+		{
+			unsetenv("SDL_AUDIODRIVER");
+		}
+
+		if (SDL_InitSubSystem(SDL_INIT_AUDIO) < 0)
+		{
+			const char *err = SDL_GetError();
+			Warning("SDLAUDIO: SDL_InitSubSystem(%s) failed: %s\n", candidates[i] ? candidates[i] : "default", err ? err : "???");
+			continue;
+		}
+
+		m_devId = SDL_OpenAudioDevice(NULL, 0, &desired, &obtained, 0);
+		if (!m_devId)
+		{
+			const char *err = SDL_GetError();
+			Warning("SDLAUDIO: SDL_OpenAudioDevice(%s) failed: %s\n", SDL_GetCurrentAudioDriver() ? SDL_GetCurrentAudioDriver() : "???", err ? err : "???");
+			SDL_QuitSubSystem(SDL_INIT_AUDIO);
+		}
+	}
+
+	if (!m_devId)
+	{
+		SDLAUDIO_FAIL("SDL_OpenAudioDevice()");
+	}
+#else
+	if (!SDL_WasInit(SDL_INIT_AUDIO))
+	{
+		if (SDL_InitSubSystem(SDL_INIT_AUDIO))
+			SDLAUDIO_FAIL("SDL_InitSubSystem(SDL_INIT_AUDIO)");
+	}
+
+	m_devId = SDL_OpenAudioDevice(NULL, 0, &desired, &obtained, 0);
 
 	if (!m_devId)
 		SDLAUDIO_FAIL("SDL_OpenAudioDevice()");
+#endif
+
+	Msg("SDLAUDIO: Using SDL audio target '%s' (%d Hz, fmt 0x%x, %d ch, %d samples)\n",
+		SDL_GetCurrentAudioDriver() ? SDL_GetCurrentAudioDriver() : "???",
+		obtained.freq, (int)obtained.format, (int)obtained.channels, (int)obtained.samples);
 
 	#undef SDLAUDIO_FAIL
 

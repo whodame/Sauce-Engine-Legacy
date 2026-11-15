@@ -38,7 +38,7 @@ void ComputeModContentFilename( const char *pGameFileName, char *pBuf, size_t nB
 void AddFilesToList( CUtlVector< CUtlString > &list, const char *pDirectory, const char *pPath, const char *pExtension );
 
 // Returns the search path as a list of paths
-void GetSearchPath( CUtlVector< CUtlString > &path, const char *pPathID );
+void GetSearchPath( CUtlVector< CUtlString > &path, const char *pPathID, bool bGetPackFiles = false );
 
 // Given file name generate a full path using the following rules.
 // 1. if its full path already return
