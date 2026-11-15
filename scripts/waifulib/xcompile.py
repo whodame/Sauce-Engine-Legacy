@@ -19,16 +19,16 @@ from collections import OrderedDict
 import os
 import sys
 
-ANDROID_NDK_ENVVARS = ['ANDROID_NDK_HOME', 'ANDROID_NDK']
-ANDROID_NDK_SUPPORTED = [10, 19, 20]
+ANDROID_NDK_ENVVARS = ['ANDROID_NDK_HOME', 'ANDROID_NDK', 'ANDROID_NDK_ROOT', 'NDK_HOME']
+ANDROID_NDK_SUPPORTED = list(range(10, 36)) # Supports NDK r10 through r30+
 ANDROID_NDK_HARDFP_MAX = 11 # latest version that supports hardfp
 ANDROID_NDK_GCC_MAX = 17 # latest NDK that ships with GCC
 ANDROID_NDK_UNIFIED_SYSROOT_MIN = 15
 ANDROID_NDK_SYSROOT_FLAG_MAX = 19 # latest NDK that need --sysroot flag
-ANDROID_NDK_API_MIN = { 10: 3, 19: 16, 20: 16 } # minimal API level ndk revision supports
+ANDROID_NDK_LLVM_SYSROOT_MIN = 22 # NDK r22+ moves sysroot into toolchains/llvm/prebuilt/<host>/sysroot
+ANDROID_NDK_LLVM_BINUTILS_MIN = 21 # NDK r21+ uses llvm-strip / llvm-ar instead of GNU binutils
 ANDROID_64BIT_API_MIN = 21 # minimal API level that supports 64-bit targets
 
-# This class does support ONLY r10e and r19c/r20 NDK
 class Android:
 	ctx            = None # waf context
 	arch           = None
@@ -38,6 +38,17 @@ class Android:
 	ndk_rev        = 0
 	is_hardfloat   = False
 	clang          = False
+
+	def min_api(self):
+		if self.ndk_rev <= 11:
+			return 3
+		elif self.ndk_rev <= 23:
+			return 16
+		elif self.ndk_rev <= 25:
+			return 19
+		else:
+			# NDK r26 - r30+ minimum supported API level is 21
+			return 21
 
 	def __init__(self, ctx, arch, toolchain, api):
 		self.ctx = ctx
@@ -53,9 +64,7 @@ class Android:
 			ctx.fatal('Set %s environment variable pointing to the root of Android NDK!' %
 				' or '.join(ANDROID_NDK_ENVVARS))
 
-		# TODO: this were added at some point of NDK development
-		# but I don't know at which version
-		# r10e don't have it
+		# Read NDK revision from source.properties (available in NDK r11+ including r30)
 		source_prop = os.path.join(self.ndk_home, 'source.properties')
 		if os.path.exists(source_prop):
 			with open(source_prop) as ndk_props_file:
@@ -71,7 +80,7 @@ class Android:
 		else:
 			self.ndk_rev = ANDROID_NDK_SUPPORTED[0]
 
-		if 'clang' in self.toolchain or self.ndk_rev > ANDROID_NDK_GCC_MAX:
+		if 'clang' in self.toolchain or self.toolchain in ['llvm', 'default'] or self.ndk_rev > ANDROID_NDK_GCC_MAX:
 			self.clang = True
 
 		if self.arch == 'armeabi-v7a-hard':
@@ -81,11 +90,12 @@ class Android:
 			else:
 				ctx.fatal('NDK does not support hardfloat ABI')
 
-		if self.api < ANDROID_NDK_API_MIN[self.ndk_rev]:
-			self.api = ANDROID_NDK_API_MIN[self.ndk_rev]
-			Logs.warn('API level automatically was set to %d due to NDK support' % self.api)
+		min_supported_api = self.min_api()
+		if self.api < min_supported_api:
+			self.api = min_supported_api
+			Logs.warn('API level automatically was set to %d due to NDK r%d support' % (self.api, self.ndk_rev))
 
-		if self.is_arm64() or self.is_amd64() and self.api < ANDROID_64BIT_API_MIN:
+		if (self.is_arm64() or self.is_amd64()) and self.api < ANDROID_64BIT_API_MIN:
 			self.api = ANDROID_64BIT_API_MIN
 			Logs.warn('API level for 64-bit target automatically was set to %d' % self.api)
 
@@ -199,24 +209,42 @@ class Android:
 	def cc(self):
 		if self.is_host():
 			return 'clang --target=%s%d' % (self.ndk_triplet(), self.api)
-		return self.gen_toolchain_path() + ('clang' if self.is_clang() else 'gcc')
+		exe = self.gen_toolchain_path() + ('clang' if self.is_clang() else 'gcc')
+		if sys.platform.startswith('win32') and os.path.exists(exe + '.cmd'):
+			return exe + '.cmd'
+		return exe
 
 	def cxx(self):
 		if self.is_host():
 			return 'clang++ --target=%s%d' % (self.ndk_triplet(), self.api)
-		return self.gen_toolchain_path() + ('clang++' if self.is_clang() else 'g++')
+		exe = self.gen_toolchain_path() + ('clang++' if self.is_clang() else 'g++')
+		if sys.platform.startswith('win32') and os.path.exists(exe + '.cmd'):
+			return exe + '.cmd'
+		return exe
 
 	def strip(self):
 		if self.is_host():
 			return 'llvm-strip'
+		if self.ndk_rev >= ANDROID_NDK_LLVM_BINUTILS_MIN:
+			ext = '.exe' if sys.platform.startswith('win32') else ''
+			return os.path.join(self.gen_gcc_toolchain_path(), 'bin', 'llvm-strip' + ext)
 		return os.path.join(self.gen_binutils_path(), 'strip')
 
+	def ar(self):
+		if self.is_host():
+			return 'llvm-ar'
+		if self.ndk_rev >= ANDROID_NDK_LLVM_BINUTILS_MIN:
+			ext = '.exe' if sys.platform.startswith('win32') else ''
+			return os.path.join(self.gen_gcc_toolchain_path(), 'bin', 'llvm-ar' + ext)
+		return os.path.join(self.gen_binutils_path(), 'ar')
+
 	def system_stl(self):
-		# TODO: proper STL support
-		return [
-			#os.path.abspath(os.path.join(self.ndk_home, 'sources', 'cxx-stl', 'system', 'include')),
-			os.path.abspath(os.path.join(self.ndk_home, 'sources', 'android', 'support', 'include'))
-		]
+		if self.ndk_rev >= ANDROID_NDK_LLVM_BINUTILS_MIN:
+			return []
+		support_inc = os.path.abspath(os.path.join(self.ndk_home, 'sources', 'android', 'support', 'include'))
+		if os.path.exists(support_inc):
+			return [support_inc]
+		return []
 
 	def libsysroot(self):
 		arch = self.arch
@@ -229,7 +257,9 @@ class Android:
 		return os.path.abspath(os.path.join(self.ndk_home, path))
 
 	def sysroot(self):
-		if self.ndk_rev >= ANDROID_NDK_UNIFIED_SYSROOT_MIN:
+		if self.ndk_rev >= ANDROID_NDK_LLVM_SYSROOT_MIN:
+			return os.path.abspath(os.path.join(self.gen_gcc_toolchain_path(), 'sysroot'))
+		elif self.ndk_rev >= ANDROID_NDK_UNIFIED_SYSROOT_MIN:
 			return os.path.abspath(os.path.join(self.ndk_home, 'sysroot'))
 		else:
 			return self.libsysroot()
@@ -248,7 +278,9 @@ class Android:
 
 		cflags += ['-I%s'%i for i in self.system_stl()]+['-DANDROID', '-D__ANDROID__']
 
-		if cxx and not self.is_clang() and self.toolchain not in ['4.8','4.9']:
+		if cxx and (self.is_clang() or self.is_host()) and self.ndk_rev >= 19:
+			cflags += ['-stdlib=libc++']
+		elif cxx and not self.is_clang() and self.toolchain not in ['4.8','4.9']:
 			cflags += ['-fno-sized-deallocation']
 
 		if self.is_arm():
@@ -295,6 +327,8 @@ class Android:
 			linkflags += ['-fuse-ld=lld']
 
 		linkflags += ['-Wl,--hash-style=both','-Wl,--no-undefined']
+		if self.ndk_rev >= 27 and (self.is_arm64() or self.is_amd64()):
+			linkflags += ['-Wl,-z,max-page-size=16384']
 		return linkflags
 
 	def ldflags(self):
@@ -303,7 +337,10 @@ class Android:
 			ldflags += ['-lgcc']
 
 		if self.is_clang() or self.is_host():
-			ldflags += ['-stdlib=libstdc++']
+			if self.ndk_rev >= 19:
+				ldflags += ['-stdlib=libc++', '-static-libstdc++']
+			else:
+				ldflags += ['-stdlib=libstdc++']
 		if self.is_arm():
 			if self.arch == 'armeabi-v7a':
 				ldflags += ['-march=armv7-a']
@@ -320,7 +357,7 @@ class Android:
 def options(opt):
 	android = opt.add_option_group('Android options')
 	android.add_option('--android', action='store', dest='ANDROID_OPTS', default=None,
-		help='enable building for android, format: --android=<arch>,<toolchain>,<api>, example: --android=armeabi-v7a-hard,4.9,21')
+		help='enable building for android, format: --android=<arch>,<toolchain>,<api>, example: --android=aarch64,clang,21')
 
 def configure(conf):
 	if conf.options.ANDROID_OPTS:
@@ -341,16 +378,18 @@ def configure(conf):
 		conf.environ['CC'] = android.cc()
 		conf.environ['CXX'] = android.cxx()
 		conf.environ['STRIP'] = android.strip()
+		conf.environ['AR'] = android.ar()
 		conf.env.CFLAGS += android.cflags()
 		conf.env.CXXFLAGS += android.cflags(True)
 		conf.env.LINKFLAGS += android.linkflags()
 		conf.env.LDFLAGS += android.ldflags()
-		conf.env.INCLUDES += [
-			os.path.abspath(os.path.join(android.ndk_home, 'sources', 'cxx-stl', 'gnu-libstdc++', '4.9', 'include')),
-			os.path.abspath(os.path.join(android.ndk_home, 'sources', 'cxx-stl', 'gnu-libstdc++', '4.9', 'libs', stlarch, 'include'))
-		]
-		conf.env.STLIBPATH += [os.path.abspath(os.path.join(android.ndk_home, 'sources','cxx-stl','gnu-libstdc++','4.9','libs',stlarch))]
-		conf.env.LDFLAGS += ['-lgnustl_static']
+		if android.ndk_rev <= ANDROID_NDK_GCC_MAX:
+			conf.env.INCLUDES += [
+				os.path.abspath(os.path.join(android.ndk_home, 'sources', 'cxx-stl', 'gnu-libstdc++', '4.9', 'include')),
+				os.path.abspath(os.path.join(android.ndk_home, 'sources', 'cxx-stl', 'gnu-libstdc++', '4.9', 'libs', stlarch, 'include'))
+			]
+			conf.env.STLIBPATH += [os.path.abspath(os.path.join(android.ndk_home, 'sources','cxx-stl','gnu-libstdc++','4.9','libs',stlarch))]
+			conf.env.LDFLAGS += ['-lgnustl_static']
 
 		conf.env.HAVE_M = True
 		if android.is_hardfp():
@@ -379,7 +418,7 @@ def post_compiler_cxx_configure(conf):
 	conf.msg('Target binfmt', conf.env.DEST_BINFMT)
 
 	if conf.options.ANDROID_OPTS:
-		if conf.android.ndk_rev == 19:
+		if conf.android.ndk_rev >= 19:
 			conf.env.CXXFLAGS_cxxshlib += ['-static-libstdc++']
 			conf.env.LDFLAGS_cxxshlib += ['-static-libstdc++']
 	return
