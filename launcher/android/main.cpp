@@ -148,6 +148,7 @@ DLL_EXPORT int LauncherMainAndroid( int argc, char **argv )
 	SetLauncherArgs();
 
 	SDL_SetHint(SDL_HINT_TOUCH_MOUSE_EVENTS, "0");
+	SDL_SetHint(SDL_HINT_ACCELEROMETER_AS_JOYSTICK, "0");
 	DeclareCurrentThreadIsMainThread(); // Init thread propertly on Android
 
 	return LauncherMain(iLastArgs, LauncherArgv);

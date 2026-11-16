@@ -30,6 +30,7 @@ ConVar r_decal_overlap_area("r_decal_overlap_area", "0.4");
 
 // if a new decal covers more than this many old decals, retire until this count remains
 ConVar r_decal_cover_count("r_decal_cover_count", "4" );
+ConVar r_decal_cullsize("r_decal_cullsize", "5", 0, "Decal cull size (deprecated)" );
 
 static unsigned int s_DecalScaleVarCache = 0;
 static unsigned int s_DecalScaleVariationVarCache = 0;

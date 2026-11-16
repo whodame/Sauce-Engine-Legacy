@@ -671,6 +671,16 @@ void CInput::JoyStickMove( float frametime, CUserCmd *cmd )
 	// complete initialization if first time in ( needed as cvars are not available at initialization time )
 	if ( !m_fJoystickAdvancedInit )
 	{
+		// If a game controller was already detected during early inputsystem init (before client cvars existed),
+		// enable in_joystick once here so it works without replugging.
+		if ( !in_joystick.GetBool() && inputsystem->GetJoystickCount() > 0 )
+		{
+			ConVarRef xcontrollerVar( "joy_xcontroller_found", true );
+			if ( xcontrollerVar.IsValid() && xcontrollerVar.GetBool() )
+			{
+				in_joystick.SetValue( 1 );
+			}
+		}
 		Joystick_Advanced();
 		m_fJoystickAdvancedInit = true;
 	}

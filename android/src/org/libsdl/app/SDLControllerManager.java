@@ -557,13 +557,15 @@ class SDLGenericMotionListener_API12 implements View.OnGenericMotionListener {
     public boolean onGenericMotion(View v, MotionEvent event) {
         float x, y;
         int action;
+        int source = event.getSource();
 
-        switch ( event.getSource() ) {
-            case InputDevice.SOURCE_JOYSTICK:
-            case InputDevice.SOURCE_GAMEPAD:
-            case InputDevice.SOURCE_DPAD:
-                return SDLControllerManager.handleJoystickMotionEvent(event);
+        if ((source & InputDevice.SOURCE_JOYSTICK) == InputDevice.SOURCE_JOYSTICK ||
+            (source & InputDevice.SOURCE_GAMEPAD) == InputDevice.SOURCE_GAMEPAD ||
+            (source & InputDevice.SOURCE_DPAD) == InputDevice.SOURCE_DPAD) {
+            return SDLControllerManager.handleJoystickMotionEvent(event);
+        }
 
+        switch ( source ) {
             case InputDevice.SOURCE_MOUSE:
                 action = event.getActionMasked();
                 switch (action) {
@@ -688,13 +690,15 @@ class SDLGenericMotionListener_API26 extends SDLGenericMotionListener_API24 {
     public boolean onGenericMotion(View v, MotionEvent event) {
         float x, y;
         int action;
+        int source = event.getSource();
 
-        switch ( event.getSource() ) {
-            case InputDevice.SOURCE_JOYSTICK:
-            case InputDevice.SOURCE_GAMEPAD:
-            case InputDevice.SOURCE_DPAD:
-                return SDLControllerManager.handleJoystickMotionEvent(event);
+        if ((source & InputDevice.SOURCE_JOYSTICK) == InputDevice.SOURCE_JOYSTICK ||
+            (source & InputDevice.SOURCE_GAMEPAD) == InputDevice.SOURCE_GAMEPAD ||
+            (source & InputDevice.SOURCE_DPAD) == InputDevice.SOURCE_DPAD) {
+            return SDLControllerManager.handleJoystickMotionEvent(event);
+        }
 
+        switch ( source ) {
             case InputDevice.SOURCE_MOUSE:
             // DeX desktop mouse cursor is a separate non-standard input type.
             case InputDevice.SOURCE_MOUSE | InputDevice.SOURCE_TOUCHSCREEN:

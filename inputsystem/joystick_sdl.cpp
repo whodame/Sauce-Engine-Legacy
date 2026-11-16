@@ -267,8 +267,8 @@ void CInputSystem::ShutdownJoysticks()
 // Update the joy_xcontroller_found convar to force CInput::JoyStickMove to re-exec 360controller-linux.cfg
 static void SetJoyXControllerFound( bool found )
 {
-	static ConVarRef xcontrollerVar( "joy_xcontroller_found" );
-	static ConVarRef joystickVar( "joystick" );
+	ConVarRef xcontrollerVar( "joy_xcontroller_found", true );
+	ConVarRef joystickVar( "joystick", true );
 	if ( xcontrollerVar.IsValid() )
 	{
 		xcontrollerVar.SetValue(found);
@@ -353,7 +353,11 @@ void CInputSystem::JoystickHotplugAdded( int joystickIndex )
 	if ( haptic == NULL || SDL_HapticRumbleInit(haptic) != 0 )
 	{
 		Warning("Unable to initialize rumble for joystick #%i: %s\n", joystickId, SDL_GetError());
-		haptic = NULL;
+		if ( haptic != NULL )
+		{
+			SDL_HapticClose( haptic );
+			haptic = NULL;
+		}
 	}
 
 	info.m_pDevice = controller;
@@ -549,7 +553,7 @@ void CInputSystem::SetXDeviceRumble( float fLeftMotor, float fRightMotor, int us
 	}
 
 	float strength = (fLeftMotor + fRightMotor) / 2.f;
-	static ConVarRef joystickVar( "joystick" );
+	ConVarRef joystickVar( "joystick", true );
 
 	// 0f means "stop".
 	bool shouldStop = ( strength < 0.01f );
