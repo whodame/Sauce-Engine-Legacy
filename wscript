@@ -186,6 +186,8 @@ def define_platform(conf):
 	conf.env.DEDICATED = conf.options.DEDICATED
 	conf.env.TESTS = conf.options.TESTS
 	conf.env.TOGLES = conf.options.TOGLES
+	conf.env.WAYLAND_ONLY = conf.options.WAYLAND_ONLY
+	conf.env.USE_MESA = conf.options.USE_MESA
 	conf.env.DXVK = conf.options.DXVK and not conf.options.TESTS and not conf.options.DEDICATED
 	# DXVK-native replaces ToGL: the engine uses its real D3D9 path, DXVK translates D3D9 to Vulkan
 	conf.env.GL = (conf.options.GL or conf.env.TOGLES or conf.env.DEST_OS != 'win32') and not conf.env.DXVK and not conf.options.TESTS and not conf.options.DEDICATED

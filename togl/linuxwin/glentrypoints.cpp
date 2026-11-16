@@ -296,7 +296,7 @@ static bool CheckOpenGLExtension_internal(const char *ext, const int coremajor, 
 				return false;
 			}
 		}
-#elif !defined ( OSX ) && !defined( __ANDROID__ ) && !defined( WAYLAND_ONLY )
+#elif !defined ( OSX ) && !defined( __ANDROID__ ) && !defined( WAYLAND_ONLY ) && !defined( SOURCE_WAYLAND_ONLY )
 		if (!ptr)
 		{
 			static CDynamicFunctionOpenGL< true, void *( APIENTRY *)( ), void * > glXGetCurrentDisplay("glXGetCurrentDisplay");

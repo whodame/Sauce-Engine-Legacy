@@ -7,6 +7,9 @@
 #ifdef USE_SDL
 #include "SDL.h"
 #include "SDL_opengl.h"
+#ifdef DXVK
+#include "SDL_vulkan.h"
+#endif
 #endif
 
 #include "appframework/ilaunchermgr.h"
@@ -58,6 +61,12 @@ COpenGLEntryPoints *gGL = NULL;
 #endif
 
 const int kBogusSwapInterval = INT_MAX;
+
+static bool IsWaylandVideoDriver()
+{
+	const char *pszVideoDriver = SDL_GetCurrentVideoDriver();
+	return ( pszVideoDriver && V_stricmp( pszVideoDriver, "wayland" ) == 0 );
+}
 
 #if defined ANDROID || defined TOGLES
 static void *l_gl4es = NULL;
@@ -515,8 +524,19 @@ InitReturnVal_t CSDLMgr::Init()
 
 	if (!SDL_WasInit(SDL_INIT_VIDEO))
 	{
+#if defined(WAYLAND_ONLY) || defined(SOURCE_WAYLAND_ONLY)
+		// Pure Wayland builds forbid falling back to X11/XWayland.
+#ifndef _WIN32
+		setenv( "SDL_VIDEODRIVER", "wayland", 1 );
+#endif
+#ifdef SDL_HINT_VIDEODRIVER
+		SDL_SetHintWithPriority( SDL_HINT_VIDEODRIVER, "wayland", SDL_HINT_OVERRIDE );
+#endif
+#endif
+
 		if (SDL_Init(SDL_INIT_VIDEO) == -1)
 		{
+#if !defined(WAYLAND_ONLY) && !defined(SOURCE_WAYLAND_ONLY)
 #ifndef _WIN32
 			unsetenv("SDL_VIDEODRIVER");
 #endif
@@ -524,6 +544,7 @@ InitReturnVal_t CSDLMgr::Init()
 			SDL_SetHintWithPriority(SDL_HINT_VIDEODRIVER, NULL, SDL_HINT_OVERRIDE);
 #endif
 			if (SDL_Init(SDL_INIT_VIDEO) == -1)
+#endif
 				Error( "SDL_Init(SDL_INIT_VIDEO) failed: %s", SDL_GetError() );
 		}
 
@@ -534,13 +555,24 @@ InitReturnVal_t CSDLMgr::Init()
 		}
 
 #if defined( TOGLES )
-		if (SDL_GL_LoadLibrary("libGLESv3.so") == -1)
+		if ( SDL_GL_LoadLibrary("libGLESv3.so") == -1 &&
+			 SDL_GL_LoadLibrary("libGLESv2.so.2") == -1 &&
+			 SDL_GL_LoadLibrary("libGLESv2.so") == -1 &&
+			 SDL_GL_LoadLibrary(NULL) == -1 )
 #else
 		if (SDL_GL_LoadLibrary(NULL) == -1)
 #endif
 			Error( "SDL_GL_LoadLibrary(NULL) failed: %s", SDL_GetError() );
 #endif
 	}
+
+#if defined(WAYLAND_ONLY) || defined(SOURCE_WAYLAND_ONLY)
+	if ( !IsWaylandVideoDriver() )
+	{
+		Error( "WAYLAND_ONLY build requires the 'wayland' SDL video driver (active: '%s').",
+			SDL_GetCurrentVideoDriver() ? SDL_GetCurrentVideoDriver() : "null" );
+	}
+#endif
 
 	fprintf(stderr, "SDL video target is '%s'\n", SDL_GetCurrentVideoDriver());
 	Msg("SDL video target is '%s'\n", SDL_GetCurrentVideoDriver());
@@ -612,27 +644,35 @@ InitReturnVal_t CSDLMgr::Init()
 
 #ifdef TOGLES
 	l_egl = dlopen("libEGL.so", RTLD_LAZY);
+	if ( !l_egl )
+		l_egl = dlopen("libEGL.so.1", RTLD_LAZY);
 	l_gles = dlopen("libGLESv3.so", RTLD_LAZY);
+	if ( !l_gles )
+		l_gles = dlopen("libGLESv2.so.2", RTLD_LAZY);
+	if ( !l_gles )
+		l_gles = dlopen("libGLESv2.so", RTLD_LAZY);
 
 	if( l_egl )
 	{
 		_glGetProcAddress = (t_glGetProcAddress)dlsym(l_egl, "eglGetProcAddress");
+		_eglInitialize = (t_eglInitialize)dlsym(l_egl, "eglInitialize");
+		_eglGetDisplay = (t_eglGetDisplay)dlsym(l_egl, "eglGetDisplay");
+		_eglQueryString = (t_eglQueryString)dlsym(l_egl, "eglQueryString");
 	}
 
 	SET_GL_ATTR(SDL_GL_CONTEXT_PROFILE_MASK, SDL_GL_CONTEXT_PROFILE_ES);
 	SET_GL_ATTR(SDL_GL_CONTEXT_MAJOR_VERSION, 3);
 	SET_GL_ATTR(SDL_GL_CONTEXT_MINOR_VERSION, 0);
 
-	_eglInitialize = (t_eglInitialize)dlsym(l_egl, "eglInitialize");
-	_eglGetDisplay = (t_eglGetDisplay)dlsym(l_egl, "eglGetDisplay");
-	_eglQueryString = (t_eglQueryString)dlsym(l_egl, "eglQueryString");
-
-	if( _eglInitialize && _eglInitialize && _eglQueryString )
+	if( _eglInitialize && _eglGetDisplay && _eglQueryString )
 	{
 		EGLDisplay display = _eglGetDisplay(EGL_DEFAULT_DISPLAY);
-		if( _eglInitialize(display, NULL, NULL) != -1
-			&& strstr(_eglQueryString(display, EGL_EXTENSIONS) ,"EGL_KHR_gl_colorspace") )
+		if( display != EGL_NO_DISPLAY && _eglInitialize(display, NULL, NULL) )
+		{
+			const char *pszEglExts = _eglQueryString(display, EGL_EXTENSIONS);
+			if( pszEglExts && strstr(pszEglExts, "EGL_KHR_gl_colorspace") )
 				SET_GL_ATTR(SDL_GL_FRAMEBUFFER_SRGB_CAPABLE, 1)
+		}
 	}
 #elif ANDROID
 	bool m_bOGL = false;
@@ -1094,6 +1134,10 @@ void CSDLMgr::SetCursorPosition( int x, int y )
 {
 	SDLAPP_FUNC;
 
+	// Wayland and SDL relative mouse mode do not support arbitrary cursor warps.
+	if ( SDL_GetRelativeMouseMode() || IsWaylandVideoDriver() )
+		return;
+
 	SDL_WarpMouseInWindow(m_Window, x, y);
 }
 
@@ -1177,10 +1221,13 @@ void CSDLMgr::OnFrameRendered()
 			if ( m_bForbidMouseGrab )
 				bWindowGrab = SDL_FALSE;
 
-			const char *pszVideoDriver = SDL_GetCurrentVideoDriver();
-			bool bIsWayland = ( pszVideoDriver && V_stricmp( pszVideoDriver, "wayland" ) == 0 );
-			if ( !bIsWayland )
+			if ( !IsWaylandVideoDriver() )
 				bRelativeMouseMode = SDL_FALSE;
+		}
+
+		if ( bRelativeMouseMode )
+		{
+			m_bExpectSyntheticMouseMotion = false;
 		}
 
 		SDL_SetWindowGrab( m_Window, bWindowGrab );
@@ -1545,8 +1592,12 @@ void CSDLMgr::SetWindowFullScreen( bool bFullScreen, int nWidth, int nHeight )
 
 	if (bFullScreen)
 	{
-		int drawableW, drawableH;
+		int drawableW = 0, drawableH = 0;
+#if defined( DXVK )
+		SDL_Vulkan_GetDrawableSize(m_Window, &drawableW, &drawableH);
+#elif defined( DX_TO_GL_ABSTRACTION )
 		SDL_GL_GetDrawableSize(m_Window, &drawableW, &drawableH);
+#endif
 
 		if ( drawableW > 0 && drawableH > 0 )
 		{
@@ -1813,6 +1864,7 @@ void CSDLMgr::PumpWindowsMessageLoop()
 				m_nMouseYDelta += event.motion.yrel;
 
 				if ( !m_bRawInput && !m_bCursorVisible &&
+					!SDL_GetRelativeMouseMode() && !IsWaylandVideoDriver() &&
 					(event.motion.x < m_nMouseTargetX - m_nWarpDelta ||
 					 event.motion.x > m_nMouseTargetX + m_nWarpDelta ||
 					 event.motion.y < m_nMouseTargetY - m_nWarpDelta ||
@@ -1966,7 +2018,8 @@ void CSDLMgr::PumpWindowsMessageLoop()
 					}
 					case SDL_WINDOWEVENT_LEAVE:
 					{
-						if ( !IsWindows() && !m_bRawInput && !m_bCursorVisible && m_bHasFocus )
+						if ( !IsWindows() && !m_bRawInput && !m_bCursorVisible && m_bHasFocus &&
+							!SDL_GetRelativeMouseMode() && !IsWaylandVideoDriver() )
 						{
 							// If the cursor is not visible and the mouse
 							// cursor somehow manages to escape the window

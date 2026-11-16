@@ -15,7 +15,9 @@ def configure(conf):
 	conf.env.append_unique('DEFINES',['strncpy=use_Q_strncpy_instead',
 		'_snprintf=use_Q_snprintf_instead','SOURCEVR_DLL'])
 	conf.check_cfg(package='openvr', uselib_store='OPENVR', args=['--cflags', '--libs'], mandatory=False)
-	conf.check(lib='GL', uselib_store='GL', mandatory=False)
+	# Under pure Wayland builds, prefer GLVND libOpenGL to avoid pulling in libGLX/libX11 via libGL.
+	if not conf.env.WAYLAND_ONLY or not conf.check(lib='OpenGL', uselib_store='GL', mandatory=False):
+		conf.check(lib='GL', uselib_store='GL', mandatory=False)
 
 def build(bld):
 	if not bld.env.LIB_OPENVR:

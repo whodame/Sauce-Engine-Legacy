@@ -1190,6 +1190,92 @@ static const char *BuildCommand()
 
 extern void InitGL4ES();
 
+#if (defined(LINUX) || defined(PLATFORM_BSD)) && defined(USE_SDL) && !defined(ANDROID)
+static bool HasSDLVideoDriver( const char *pszDriver )
+{
+	for ( int i = 0; i < SDL_GetNumVideoDrivers(); ++i )
+	{
+		const char *pszName = SDL_GetVideoDriver( i );
+		if ( pszName && V_stricmp( pszName, pszDriver ) == 0 )
+			return true;
+	}
+	return false;
+}
+
+static void ConfigureSDLPlatformEnvironment()
+{
+	const bool bHasWaylandDriver = HasSDLVideoDriver( "wayland" );
+	const bool bHasWaylandDisplay = ( getenv( "WAYLAND_DISPLAY" ) != NULL );
+
+#if defined(WAYLAND_ONLY) || defined(SOURCE_WAYLAND_ONLY)
+	// Pure Wayland builds require the Wayland SDL video driver and must never fall back to X11.
+	setenv( "SDL_VIDEODRIVER", "wayland", 1 );
+#ifdef SDL_HINT_VIDEODRIVER
+	SDL_SetHintWithPriority( SDL_HINT_VIDEODRIVER, "wayland", SDL_HINT_OVERRIDE );
+#endif
+	if ( !bHasWaylandDriver )
+	{
+		Warning( "WAYLAND_ONLY build: SDL2 reports no 'wayland' video driver!\n" );
+	}
+#else
+	if ( CommandLine()->FindParm( "-x11" ) )
+	{
+		setenv( "SDL_VIDEODRIVER", "x11", 1 );
+#ifdef SDL_HINT_VIDEODRIVER
+		SDL_SetHintWithPriority( SDL_HINT_VIDEODRIVER, "x11", SDL_HINT_OVERRIDE );
+#endif
+	}
+	else if ( CommandLine()->FindParm( "-wayland" ) )
+	{
+		setenv( "SDL_VIDEODRIVER", "wayland", 1 );
+#ifdef SDL_HINT_VIDEODRIVER
+		SDL_SetHintWithPriority( SDL_HINT_VIDEODRIVER, "wayland", SDL_HINT_OVERRIDE );
+#endif
+	}
+	else if ( bHasWaylandDriver && bHasWaylandDisplay && getenv( "SDL_VIDEODRIVER" ) == NULL )
+	{
+		setenv( "SDL_VIDEODRIVER", "wayland,x11", 0 );
+#ifdef SDL_HINT_VIDEODRIVER
+		SDL_SetHint( SDL_HINT_VIDEODRIVER, "wayland,x11" );
+#endif
+	}
+#endif // WAYLAND_ONLY || SOURCE_WAYLAND_ONLY
+
+#if defined(USE_MESA) || defined(USE_MESA_ZINK)
+	setenv( "MESA_LOADER_DRIVER_OVERRIDE", "zink", 0 );
+#if defined(WAYLAND_ONLY) || defined(SOURCE_WAYLAND_ONLY)
+	setenv( "EGL_PLATFORM", "wayland", 0 );
+#else
+	const char *pszVideoDriver = getenv( "SDL_VIDEODRIVER" );
+	if ( bHasWaylandDisplay && pszVideoDriver && V_stricmp( pszVideoDriver, "wayland" ) == 0 )
+	{
+		setenv( "EGL_PLATFORM", "wayland", 0 );
+	}
+	else if ( !pszVideoDriver || V_stristr( pszVideoDriver, "x11" ) != NULL )
+	{
+		setenv( "__GLX_VENDOR_LIBRARY_NAME", "mesa", 0 );
+	}
+#endif
+#if defined(TOGLES) && defined(SDL_HINT_OPENGL_ES_DRIVER)
+	SDL_SetHint( SDL_HINT_OPENGL_ES_DRIVER, "1" );
+#endif
+#endif // USE_MESA || USE_MESA_ZINK
+
+#if defined(__OpenBSD__) || defined(PLATFORM_OPENBSD)
+	setenv( "SDL_AUDIODRIVER", "sndio", 0 );
+#endif
+
+#if defined(TOGLES)
+#if !defined(WAYLAND_ONLY) && !defined(SOURCE_WAYLAND_ONLY)
+	SDL_SetHint( SDL_HINT_VIDEO_X11_FORCE_EGL, "1" );
+#endif
+#ifdef SDL_HINT_OPENGL_ES_DRIVER
+	SDL_SetHint( SDL_HINT_OPENGL_ES_DRIVER, "1" );
+#endif
+#endif
+}
+#endif // (LINUX || PLATFORM_BSD) && USE_SDL && !ANDROID
+
 //-----------------------------------------------------------------------------
 // Purpose: The real entry point for the application
 // Input  : hInstance - 
@@ -1224,43 +1310,6 @@ DLL_EXPORT int LauncherMain( int argc, char **argv )
 	}
 
 #endif // LINUX
-
-#ifdef USE_SDL
-	SDL_version ver;
-	SDL_GetVersion( &ver );
-	Msg("SDL version: %d.%d.%d rev: %s\n", (int)ver.major, (int)ver.minor, (int)ver.patch, SDL_GetRevision());
-#endif
-
-#if (defined LINUX || defined PLATFORM_BSD) && defined USE_SDL
-#if defined(WAYLAND_ONLY) || defined(SOURCE_WAYLAND_ONLY)
-	bool bHasWaylandDriver = false;
-	for ( int i = 0; i < SDL_GetNumVideoDrivers(); ++i )
-	{
-		if ( SDL_GetVideoDriver( i ) && V_stricmp( SDL_GetVideoDriver( i ), "wayland" ) == 0 )
-		{
-			bHasWaylandDriver = true;
-			break;
-		}
-	}
-	if ( bHasWaylandDriver && getenv( "WAYLAND_DISPLAY" ) != NULL )
-	{
-		setenv( "SDL_VIDEODRIVER", "wayland", 0 );
-		SDL_SetHint( SDL_HINT_VIDEODRIVER, "wayland" );
-	}
-#endif
-#if defined(USE_MESA) || defined(USE_MESA_ZINK)
-	setenv("MESA_LOADER_DRIVER_OVERRIDE", "zink", 0);
-	setenv("__GLX_VENDOR_LIBRARY_NAME", "mesa", 0);
-	setenv("EGL_PLATFORM", "wayland", 0);
-	SDL_SetHint(SDL_HINT_OPENGL_ES_DRIVER, "1");
-#endif
-#if defined(__OpenBSD__) || defined(PLATFORM_OPENBSD)
-	setenv("SDL_AUDIODRIVER", "sndio", 0);
-#endif
-#if defined TOGLES && !defined ANDROID
-	SDL_SetHint(SDL_HINT_VIDEO_X11_FORCE_EGL, "1");
-#endif
-#endif
 
 #ifdef WIN32
 	SetAppInstance( hInstance );
@@ -1307,6 +1356,15 @@ DLL_EXPORT int LauncherMain( int argc, char **argv )
 		CommandLine()->RemoveParm( "-maxdxlevel" );
 		CommandLine()->RemoveParm( "+mat_dxlevel" );
 	}
+
+#ifdef USE_SDL
+	SDL_version ver;
+	SDL_GetVersion( &ver );
+	Msg("SDL version: %d.%d.%d rev: %s\n", (int)ver.major, (int)ver.minor, (int)ver.patch, SDL_GetRevision());
+#if (defined(LINUX) || defined(PLATFORM_BSD)) && !defined(ANDROID)
+	ConfigureSDLPlatformEnvironment();
+#endif
+#endif
 	
 	// Figure out the directory the executable is running from
 	UTIL_ComputeBaseDir();
