@@ -524,7 +524,7 @@ InitReturnVal_t CSDLMgr::Init()
 
 	if (!SDL_WasInit(SDL_INIT_VIDEO))
 	{
-#if defined(WAYLAND_ONLY) || defined(SOURCE_WAYLAND_ONLY)
+#if (defined(WAYLAND_ONLY) || defined(SOURCE_WAYLAND_ONLY)) && !defined(__OpenBSD__) && !defined(PLATFORM_OPENBSD)
 		// Pure Wayland builds forbid falling back to X11/XWayland.
 #ifndef _WIN32
 		setenv( "SDL_VIDEODRIVER", "wayland", 1 );
@@ -536,7 +536,7 @@ InitReturnVal_t CSDLMgr::Init()
 
 		if (SDL_Init(SDL_INIT_VIDEO) == -1)
 		{
-#if !defined(WAYLAND_ONLY) && !defined(SOURCE_WAYLAND_ONLY)
+#if (!defined(WAYLAND_ONLY) && !defined(SOURCE_WAYLAND_ONLY)) || defined(__OpenBSD__) || defined(PLATFORM_OPENBSD)
 #ifndef _WIN32
 			unsetenv("SDL_VIDEODRIVER");
 #endif
@@ -569,8 +569,13 @@ InitReturnVal_t CSDLMgr::Init()
 #if defined(WAYLAND_ONLY) || defined(SOURCE_WAYLAND_ONLY)
 	if ( !IsWaylandVideoDriver() )
 	{
+#if defined(__OpenBSD__) || defined(PLATFORM_OPENBSD)
+		Warning( "WAYLAND_ONLY build on OpenBSD fell back to SDL video driver '%s'.\n",
+			SDL_GetCurrentVideoDriver() ? SDL_GetCurrentVideoDriver() : "null" );
+#else
 		Error( "WAYLAND_ONLY build requires the 'wayland' SDL video driver (active: '%s').",
 			SDL_GetCurrentVideoDriver() ? SDL_GetCurrentVideoDriver() : "null" );
+#endif
 	}
 #endif
 

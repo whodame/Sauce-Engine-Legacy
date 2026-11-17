@@ -291,6 +291,7 @@ def define_platform(conf):
 			defs.append('OPENBSD=1')
 			defs.append('NO_HOOK_MALLOC')
 			conf.env.append_unique('INCLUDES', ['/usr/local/include', '/usr/X11R6/include'])
+			conf.env.append_unique('LIBPATH', ['/usr/local/lib', '/usr/X11R6/lib'])
 			conf.env.append_unique('LINKFLAGS', ['-L/usr/local/lib', '-L/usr/X11R6/lib'])
 		elif conf.env.DEST_OS == 'freebsd':
 			defs.append('PLATFORM_FBSD=1')
@@ -438,9 +439,21 @@ def check_deps(conf):
 		conf.env.FRAMEWORK_AUDIOTOOLBOX = "AudioToolbox"
 		conf.env.FRAMEWORK_SYSTEMCONFIGURATION = "SystemConfiguration"
 	elif conf.env.DEST_OS in ['freebsd', 'openbsd', 'netbsd', 'dragonflybsd']:
+		conf.check_cc(lib='execinfo', uselib_store='EXECINFO', mandatory=False)
 		conf.check_cc(lib='iconv', uselib_store='ICONV', mandatory=False)
-		conf.env.append_unique('LINKFLAGS', ['-liconv'])
-		conf.env.append_unique('LIB', ['iconv'])
+		if conf.env.LIB_EXECINFO:
+			conf.env.append_unique('LIB', ['execinfo'])
+		if conf.env.DEST_OS == 'openbsd':
+			conf.env.append_unique('LIBPATH_ICONV', ['/usr/local/lib'])
+			conf.env.append_unique('LIB_ICONV', ['iconv'])
+			conf.env.append_unique('LIB', ['iconv', 'sndio'])
+			if conf.check_cc(lib='atomic', mandatory=False):
+				conf.env.append_unique('LIB', ['atomic'])
+		else:
+			if conf.env.LIB_ICONV:
+				conf.env.append_unique('LIB', ['iconv'])
+			if conf.check_cc(lib='atomic', mandatory=False):
+				conf.env.append_unique('LIB', ['atomic'])
 
 	if conf.options.TESTS:
 		return
@@ -629,13 +642,9 @@ def configure(conf):
 	if conf.env.DEST_CPU in [ 'arm', 'thumb' ]:
 		flags += ['-march=armv7-a', '-mfpu=neon-vfpv4']
 
-	if conf.env.DEST_OS in ['freebsd', 'openbsd', 'netbsd', 'dragonflybsd']:
-		linkflags += ['-lexecinfo', '-liconv']
-		conf.env.append_unique('LIB', ['execinfo', 'iconv'])
-		if conf.env.DEST_OS == 'openbsd':
-			linkflags += ['-lsndio', '-Wl,-z,wxneeded']
-			conf.env.append_unique('LIB', ['sndio'])
-			conf.env.RPATH += ['/usr/local/lib', '/usr/X11R6/lib']
+	if conf.env.DEST_OS == 'openbsd':
+		linkflags += ['-Wl,-z,wxneeded']
+		conf.env.RPATH += ['/usr/local/lib', '/usr/X11R6/lib']
 
 	if conf.options.WAYLAND_ONLY:
 		conf.define('WAYLAND_ONLY', 1)
@@ -649,7 +658,7 @@ def configure(conf):
 		# 16-byte CAS (tier0/tslist.h) comes from libatomic on RISC-V.
 		# Added as LIB (not a linker flag) so it comes after the objects (--as-needed).
 		conf.env.append_unique('LIB', ['atomic'])
-	elif conf.env.DEST_OS != 'darwin' and conf.env.DEST_OS != 'win32':
+	elif conf.env.DEST_OS not in ['darwin', 'win32', 'freebsd', 'openbsd', 'netbsd', 'dragonflybsd']:
 		linkflags += ['-latomic']
 	if conf.env.DEST_OS != 'win32':
 		cflags += flags

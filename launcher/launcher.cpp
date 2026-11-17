@@ -1208,6 +1208,21 @@ static void ConfigureSDLPlatformEnvironment()
 	const bool bHasWaylandDisplay = ( getenv( "WAYLAND_DISPLAY" ) != NULL );
 
 #if defined(WAYLAND_ONLY) || defined(SOURCE_WAYLAND_ONLY)
+#if defined(__OpenBSD__) || defined(PLATFORM_OPENBSD)
+	// Stock OpenBSD SDL2 packages often lack Wayland or run under Xenocara X11.
+	// Force Wayland only when both the driver and an active display or -wayland exist.
+	if ( !CommandLine()->FindParm( "-x11" ) && bHasWaylandDriver && ( bHasWaylandDisplay || CommandLine()->FindParm( "-wayland" ) ) )
+	{
+		setenv( "SDL_VIDEODRIVER", "wayland", 1 );
+#ifdef SDL_HINT_VIDEODRIVER
+		SDL_SetHintWithPriority( SDL_HINT_VIDEODRIVER, "wayland", SDL_HINT_OVERRIDE );
+#endif
+	}
+	else if ( !bHasWaylandDriver )
+	{
+		Warning( "OpenBSD SDL2 has no 'wayland' video driver; falling back to default X11 driver.\n" );
+	}
+#else
 	// Pure Wayland builds require the Wayland SDL video driver and must never fall back to X11.
 	setenv( "SDL_VIDEODRIVER", "wayland", 1 );
 #ifdef SDL_HINT_VIDEODRIVER
@@ -1217,6 +1232,7 @@ static void ConfigureSDLPlatformEnvironment()
 	{
 		Warning( "WAYLAND_ONLY build: SDL2 reports no 'wayland' video driver!\n" );
 	}
+#endif
 #else
 	if ( CommandLine()->FindParm( "-x11" ) )
 	{
@@ -1241,13 +1257,12 @@ static void ConfigureSDLPlatformEnvironment()
 	}
 #endif // WAYLAND_ONLY || SOURCE_WAYLAND_ONLY
 
+	const char *pszVideoDriver = getenv( "SDL_VIDEODRIVER" );
+	const bool bExpectWayland = ( pszVideoDriver && V_stricmp( pszVideoDriver, "wayland" ) == 0 );
+
 #if defined(USE_MESA) || defined(USE_MESA_ZINK)
 	setenv( "MESA_LOADER_DRIVER_OVERRIDE", "zink", 0 );
-#if defined(WAYLAND_ONLY) || defined(SOURCE_WAYLAND_ONLY)
-	setenv( "EGL_PLATFORM", "wayland", 0 );
-#else
-	const char *pszVideoDriver = getenv( "SDL_VIDEODRIVER" );
-	if ( bHasWaylandDisplay && pszVideoDriver && V_stricmp( pszVideoDriver, "wayland" ) == 0 )
+	if ( bHasWaylandDisplay && bExpectWayland )
 	{
 		setenv( "EGL_PLATFORM", "wayland", 0 );
 	}
@@ -1255,7 +1270,6 @@ static void ConfigureSDLPlatformEnvironment()
 	{
 		setenv( "__GLX_VENDOR_LIBRARY_NAME", "mesa", 0 );
 	}
-#endif
 #if defined(TOGLES) && defined(SDL_HINT_OPENGL_ES_DRIVER)
 	SDL_SetHint( SDL_HINT_OPENGL_ES_DRIVER, "1" );
 #endif
@@ -1266,9 +1280,10 @@ static void ConfigureSDLPlatformEnvironment()
 #endif
 
 #if defined(TOGLES)
-#if !defined(WAYLAND_ONLY) && !defined(SOURCE_WAYLAND_ONLY)
-	SDL_SetHint( SDL_HINT_VIDEO_X11_FORCE_EGL, "1" );
-#endif
+	if ( !bExpectWayland )
+	{
+		SDL_SetHint( SDL_HINT_VIDEO_X11_FORCE_EGL, "1" );
+	}
 #ifdef SDL_HINT_OPENGL_ES_DRIVER
 	SDL_SetHint( SDL_HINT_OPENGL_ES_DRIVER, "1" );
 #endif
