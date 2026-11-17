@@ -649,6 +649,7 @@ PLATFORM_INTERFACE bool Plat_ApplyOpenBSDSandbox( const char *pszGameDir, bool b
 		unveil( "/usr/local/lib", "r" );
 		unveil( "/usr/lib", "r" );
 		unveil( "/usr/X11R6/lib", "r" );
+		unveil( "/usr/X11R6/share", "r" );	// drirc.d, X11 locale/XKB data
 		unveil( "/usr/local/share", "r" );
 		unveil( "/usr/share", "r" );
 		unveil( "/etc", "r" );

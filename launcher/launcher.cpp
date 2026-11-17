@@ -1261,7 +1261,11 @@ static void ConfigureSDLPlatformEnvironment()
 	const bool bExpectWayland = ( pszVideoDriver && V_stricmp( pszVideoDriver, "wayland" ) == 0 );
 
 #if defined(USE_MESA) || defined(USE_MESA_ZINK)
+#if !defined(__OpenBSD__) && !defined(PLATFORM_OPENBSD)
+	// OpenBSD has no Vulkan/zink: forcing this override makes Mesa fail to load
+	// any DRI driver (including swrast), so GLX ends up with no visuals at all.
 	setenv( "MESA_LOADER_DRIVER_OVERRIDE", "zink", 0 );
+#endif
 	if ( bHasWaylandDisplay && bExpectWayland )
 	{
 		setenv( "EGL_PLATFORM", "wayland", 0 );
