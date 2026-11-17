@@ -881,6 +881,30 @@ bool CSDLMgr::CreateHiddenGameWindow( const char *pTitle, int width, int height 
 #endif
 	m_Window = SDL_CreateWindow( pTitle, x, y, width, height, flags );
 
+#if defined( DX_TO_GL_ABSTRACTION )
+	// Software/limited GLX drivers (e.g. OpenBSD llvmpipe, VMs) may lack the
+	// preferred visual. Retry with progressively relaxed requirements.
+	for ( int nRelax = 0; m_Window == NULL && nRelax < 3; nRelax++ )
+	{
+		Warning( "SDL_CreateWindow failed (%s), relaxing GL visual (step %d)\n", SDL_GetError(), nRelax + 1 );
+		if ( nRelax == 0 )
+		{
+			SDL_GL_SetAttribute( SDL_GL_ACCELERATED_VISUAL, 0 );
+		}
+		else if ( nRelax == 1 )
+		{
+			SDL_GL_SetAttribute( SDL_GL_ALPHA_SIZE, 0 );
+			SDL_GL_SetAttribute( SDL_GL_FRAMEBUFFER_SRGB_CAPABLE, 0 );
+		}
+		else
+		{
+			SDL_GL_SetAttribute( SDL_GL_DEPTH_SIZE, 16 );
+			SDL_GL_SetAttribute( SDL_GL_STENCIL_SIZE, 0 );
+		}
+		m_Window = SDL_CreateWindow( pTitle, x, y, width, height, flags );
+	}
+#endif
+
 	if (m_Window == NULL)
 		Error( "Failed to create SDL window: %s", SDL_GetError() );
 	SetAssertDialogParent( m_Window );
