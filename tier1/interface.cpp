@@ -29,7 +29,11 @@
 #include <direct.h> // getcwd
 #elif POSIX
 #include <dlfcn.h>
+#include <limits.h>
 #include <unistd.h>
+#ifdef OSX
+#include <mach-o/dyld.h>
+#endif
 #define _getcwd getcwd
 #endif
 #if defined( _X360 )
@@ -289,6 +293,83 @@ bool foundLibraryWithPrefix( char *pModuleAbsolutePath, size_t AbsolutePathSize,
 	return bFound;
 }
 
+static bool GetDirFromFilePath( const char *pFilePath, char *pOutDir, size_t nOutSize )
+{
+	if ( !pFilePath || !pFilePath[0] )
+		return false;
+
+	char resolved[ PATH_MAX ];
+	const char *pSrc = realpath( pFilePath, resolved ) ? resolved : pFilePath;
+	Q_strncpy( pOutDir, pSrc, (int)nOutSize );
+	char *pSlash = strrchr( pOutDir, '/' );
+	if ( !pSlash )
+		return false;
+	if ( pSlash == pOutDir )
+		pOutDir[1] = '\0';
+	else
+		*pSlash = '\0';
+	return true;
+}
+
+static bool FindPosixModulePath( char *pOutPath, size_t nOutSize, const char *pCwd, const char *pModuleName )
+{
+	char szSelfDir[ PATH_MAX ] = { 0 };
+	Dl_info dlInfo;
+	if ( dladdr( (const void *)&Sys_LoadModule, &dlInfo ) && dlInfo.dli_fname )
+	{
+		GetDirFromFilePath( dlInfo.dli_fname, szSelfDir, sizeof( szSelfDir ) );
+	}
+
+	char szExeDir[ PATH_MAX ] = { 0 };
+#if defined( LINUX )
+	char szExeLink[ PATH_MAX ];
+	ssize_t nLen = readlink( "/proc/self/exe", szExeLink, sizeof( szExeLink ) - 1 );
+	if ( nLen > 0 )
+	{
+		szExeLink[ nLen ] = '\0';
+		GetDirFromFilePath( szExeLink, szExeDir, sizeof( szExeDir ) );
+	}
+#elif defined( OSX )
+	char szExeBuf[ PATH_MAX ];
+	uint32_t nBufSize = (uint32_t)sizeof( szExeBuf );
+	if ( _NSGetExecutablePath( szExeBuf, &nBufSize ) == 0 )
+	{
+		GetDirFromFilePath( szExeBuf, szExeDir, sizeof( szExeDir ) );
+	}
+#endif
+
+	char szCandidates[ 16 ][ PATH_MAX ];
+	int nCandidates = 0;
+
+	const char *baseDirs[] = { szSelfDir, szExeDir, pCwd };
+	for ( int b = 0; b < 3; b++ )
+	{
+		const char *pBase = baseDirs[b];
+		if ( !pBase || !pBase[0] )
+			continue;
+
+		static const char *const kSuffixes[] = { "", "/bin", "/lib/srceng", "/../lib/srceng", "/../bin" };
+		for ( size_t s = 0; s < sizeof( kSuffixes ) / sizeof( kSuffixes[0] ); s++ )
+		{
+			if ( b == 2 && kSuffixes[s][0] == '/' && kSuffixes[s][1] == '.' )
+				continue;
+			if ( nCandidates < 16 )
+			{
+				Q_snprintf( szCandidates[ nCandidates ], PATH_MAX, "%s%s", pBase, kSuffixes[s] );
+				nCandidates++;
+			}
+		}
+	}
+
+	for ( int i = 0; i < nCandidates; i++ )
+	{
+		if ( foundLibraryWithPrefix( pOutPath, nOutSize, szCandidates[i], pModuleName ) )
+			return true;
+	}
+
+	return false;
+}
+
 #endif
 
 //-----------------------------------------------------------------------------
@@ -349,18 +430,22 @@ CSysModule *Sys_LoadModule( const char *pModuleName, Sys_Flags flags /* = SYS_NO
 		}
 
 #elif defined( POSIX )
-		if( !foundLibraryWithPrefix(szAbsoluteModuleName, sizeof(szAbsoluteModuleName), LIBDIR, pModuleName) )
+		if ( FindPosixModulePath( szAbsoluteModuleName, sizeof(szAbsoluteModuleName), szCwd, pModuleName ) )
+		{
+			Msg("LoadLibrary: pModule: %s, path: %s\n", pModuleName, szAbsoluteModuleName);
+			hDLL = Sys_LoadLibrary( szAbsoluteModuleName, flags );
+		}
+		if ( !hDLL )
 		{
 			Warning("Can't find module - %s\n", pModuleName);
-			return reinterpret_cast<CSysModule *>(hDLL);
 		}
 #else
 		Q_snprintf( szAbsoluteModuleName, sizeof(szAbsoluteModuleName), "%s/bin/%s", szCwd, pModuleName );
-#endif
 		Msg("LoadLibrary: pModule: %s, path: %s\n", pModuleName, szAbsoluteModuleName);
 
 		if( !hDLL )
 			hDLL = Sys_LoadLibrary( szAbsoluteModuleName, flags );
+#endif
 	}
 	else
 	{

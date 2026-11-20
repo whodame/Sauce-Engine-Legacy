@@ -17,6 +17,11 @@
 #include <process.h>
 #elif defined( POSIX )
 #include <unistd.h>
+#include <limits.h>
+#include <stdlib.h>
+#ifdef OSX
+#include <mach-o/dyld.h>
+#endif
 #define _chdir chdir
 #define _access access
 #endif
@@ -292,14 +297,75 @@ static bool Sys_GetExecutableName( char *out, int len )
 		return false;
     }
 #else
-	if ( CommandLine()->GetParm(0) )
-	{
-		Q_MakeAbsolutePath( out, len, CommandLine()->GetParm(0) );
-	}
-	else
-	{
+	if ( !out || len <= 0 )
 		return false;
+	out[0] = '\0';
+
+#if defined( LINUX )
+	ssize_t nLen = readlink( "/proc/self/exe", out, len - 1 );
+	if ( nLen > 0 )
+	{
+		out[nLen] = '\0';
+		return true;
 	}
+#elif defined( OSX )
+	uint32_t nBufSize = (uint32_t)len;
+	if ( _NSGetExecutablePath( out, &nBufSize ) == 0 )
+	{
+		char resolved[ PATH_MAX ];
+		if ( realpath( out, resolved ) )
+		{
+			Q_strncpy( out, resolved, len );
+		}
+		return true;
+	}
+#endif
+
+	const char *argv0 = CommandLine()->GetParm(0);
+	if ( argv0 && argv0[0] )
+	{
+		char resolved[ PATH_MAX ];
+		if ( strchr( argv0, '/' ) )
+		{
+			if ( realpath( argv0, resolved ) )
+			{
+				Q_strncpy( out, resolved, len );
+			}
+			else
+			{
+				Q_MakeAbsolutePath( out, len, argv0 );
+			}
+			return true;
+		}
+		const char *pEnvPath = getenv( "PATH" );
+		if ( pEnvPath )
+		{
+			const char *p = pEnvPath;
+			while ( *p )
+			{
+				const char *pColon = strchr( p, ':' );
+				size_t nDirLen = pColon ? (size_t)( pColon - p ) : strlen( p );
+				char candidate[ PATH_MAX ];
+				if ( nDirLen > 0 && nDirLen + 1 + strlen( argv0 ) + 1 < sizeof( candidate ) )
+				{
+					memcpy( candidate, p, nDirLen );
+					candidate[nDirLen] = '/';
+					strcpy( candidate + nDirLen + 1, argv0 );
+					if ( access( candidate, X_OK ) == 0 && realpath( candidate, resolved ) )
+					{
+						Q_strncpy( out, resolved, len );
+						return true;
+					}
+				}
+				if ( !pColon )
+					break;
+				p = pColon + 1;
+			}
+		}
+		Q_MakeAbsolutePath( out, len, argv0 );
+		return true;
+	}
+	return false;
 #endif
 
 	return true;
@@ -309,12 +375,21 @@ bool FileSystem_GetExecutableDir( char *exedir, int exeDirLen )
 {
 #ifdef ANDROID
 	Q_strncpy( exedir, getenv("APP_LIB_PATH"), exeDirLen );
-#else
-# ifdef _WIN32
+#elif defined( _WIN32 )
 	Q_strncpy( exedir, "./bin", exeDirLen );
-# else
-	Q_strncpy( exedir, LIBDIR, exeDirLen );
-# endif
+#else
+	if ( Sys_GetExecutableName( exedir, exeDirLen ) )
+	{
+		Q_StripFilename( exedir );
+		if ( !exedir[0] )
+		{
+			Q_strncpy( exedir, ".", exeDirLen );
+		}
+	}
+	else
+	{
+		Q_strncpy( exedir, ".", exeDirLen );
+	}
 #endif
 
 	return true;
@@ -1047,27 +1122,74 @@ void SetSteamUserPassphrase( KeyValues *pSteamInfo, CSteamEnvVars &steamEnvVars 
 	}
 }
 
+#if defined( POSIX ) && !defined( ANDROID )
+static void AddDirIfExists( IFileSystem *pFileSystem, const char *pDir, const char *pPathID )
+{
+	if ( !pDir || !pDir[0] )
+		return;
+
+	struct stat st;
+	if ( stat( pDir, &st ) == 0 && S_ISDIR( st.st_mode ) )
+	{
+		pFileSystem->AddSearchPath( pDir, pPathID );
+	}
+}
+#endif
+
 FSReturnCode_t FileSystem_SetBasePaths( IFileSystem *pFileSystem )
 {
 	pFileSystem->RemoveSearchPaths( "EXECUTABLE_PATH" );
 
-	char path[MAX_PATH];
-	if ( !FileSystem_GetExecutableDir( path, MAX_PATH ) )
+	char exeDir[MAX_PATH];
+	if ( !FileSystem_GetExecutableDir( exeDir, MAX_PATH ) )
 		return SetupFileSystemError( false, FS_INVALID_PARAMETERS, "FileSystem_GetExecutableDir failed." );
 
-	pFileSystem->AddSearchPath( path, "EXECUTABLE_PATH" );
+	pFileSystem->AddSearchPath( exeDir, "EXECUTABLE_PATH" );
+#if defined( POSIX ) && !defined( ANDROID )
+	static const char *const kExeSubdirs[] = { "%s/bin", "%s/lib/srceng", "%s/../lib/srceng" };
+	for ( size_t i = 0; i < sizeof( kExeSubdirs ) / sizeof( kExeSubdirs[0] ); i++ )
+	{
+		char extraPath[MAX_PATH];
+		Q_snprintf( extraPath, sizeof( extraPath ), kExeSubdirs[i], exeDir );
+		AddDirIfExists( pFileSystem, extraPath, "EXECUTABLE_PATH" );
+	}
+	AddDirIfExists( pFileSystem, "bin", "EXECUTABLE_PATH" );
+	AddDirIfExists( pFileSystem, "lib/srceng", "EXECUTABLE_PATH" );
+#endif
 
-	if ( !FileSystem_GetBaseDir( path, MAX_PATH ) )
+	char baseDir[MAX_PATH];
+	if ( !FileSystem_GetBaseDir( baseDir, MAX_PATH ) )
 		return SetupFileSystemError( false, FS_INVALID_PARAMETERS, "FileSystem_GetBaseDir failed." );
 
-	pFileSystem->AddSearchPath( path, "BASE_PATH" );
+	pFileSystem->AddSearchPath( baseDir, "BASE_PATH" );
 
-	// path for client/server libraries
-	// "hl2/portal" -> "LIBDIR/portal"; "hl2" -> "LIBDIR/hl2"
+	// path for client/server libraries relative to game root and executable location
 	char gamePath[MAX_PATH];
 	V_FileBase( CommandLine()->ParmValue("-game"), gamePath, MAX_PATH );
-	Q_snprintf( path, MAX_PATH, "%s/%s", LIBDIR, gamePath );
-	pFileSystem->AddSearchPath( path, "GAMEBIN" );
+	char gameBin[MAX_PATH];
+#if defined( POSIX ) && !defined( ANDROID )
+	Q_snprintf( gameBin, sizeof( gameBin ), "%s/bin", gamePath );
+	pFileSystem->AddSearchPath( gameBin, "GAMEBIN" );
+
+	const char *const exeGameBinFmts[] = {
+		"%s/%s/bin",
+		"%s/%s",
+		"%s/lib/srceng/%s/bin",
+		"%s/lib/srceng/%s",
+		"%s/../lib/srceng/%s/bin",
+		"%s/../lib/srceng/%s",
+	};
+	for ( size_t i = 0; i < sizeof( exeGameBinFmts ) / sizeof( exeGameBinFmts[0] ); i++ )
+	{
+		Q_snprintf( gameBin, sizeof( gameBin ), exeGameBinFmts[i], exeDir, gamePath );
+		AddDirIfExists( pFileSystem, gameBin, "GAMEBIN" );
+	}
+	Q_snprintf( gameBin, sizeof( gameBin ), "lib/srceng/%s/bin", gamePath );
+	AddDirIfExists( pFileSystem, gameBin, "GAMEBIN" );
+#else
+	Q_snprintf( gameBin, sizeof( gameBin ), "%s/%s", exeDir, gamePath );
+	pFileSystem->AddSearchPath( gameBin, "GAMEBIN" );
+#endif
 
 	return FS_OK;
 }

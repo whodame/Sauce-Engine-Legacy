@@ -25,6 +25,10 @@
 #include <dlfcn.h>
 #include <limits.h>
 #include <string.h>
+#include <unistd.h>
+#ifdef __APPLE__
+#include <mach-o/dyld.h>
+#endif
 #define MAX_PATH PATH_MAX
 #endif
 
@@ -214,20 +218,141 @@ static void WaitForDebuggerConnect( int argc, char *argv[], int time )
 
 #endif // !LINUX
 
+static bool GetExeDirPosix( const char *argv0, char *outDir, size_t outSize )
+{
+	char exePath[ MAX_PATH ];
+	exePath[0] = '\0';
+
+#if defined( LINUX )
+	ssize_t len = readlink( "/proc/self/exe", exePath, sizeof( exePath ) - 1 );
+	if ( len > 0 )
+	{
+		exePath[ len ] = '\0';
+	}
+#elif defined( __APPLE__ )
+	uint32_t size = (uint32_t)sizeof( exePath );
+	if ( _NSGetExecutablePath( exePath, &size ) == 0 )
+	{
+		char resolved[ MAX_PATH ];
+		if ( realpath( exePath, resolved ) )
+		{
+			strncpy( exePath, resolved, sizeof( exePath ) - 1 );
+			exePath[ sizeof( exePath ) - 1 ] = '\0';
+		}
+	}
+	else
+	{
+		exePath[0] = '\0';
+	}
+#endif
+
+	if ( !exePath[0] && argv0 && argv0[0] )
+	{
+		if ( strchr( argv0, '/' ) )
+		{
+			if ( !realpath( argv0, exePath ) )
+			{
+				strncpy( exePath, argv0, sizeof( exePath ) - 1 );
+				exePath[ sizeof( exePath ) - 1 ] = '\0';
+			}
+		}
+		else
+		{
+			const char *envPath = getenv( "PATH" );
+			if ( envPath )
+			{
+				const char *p = envPath;
+				while ( *p )
+				{
+					const char *colon = strchr( p, ':' );
+					size_t dirLen = colon ? (size_t)( colon - p ) : strlen( p );
+					char candidate[ MAX_PATH ];
+					if ( dirLen > 0 && dirLen + 1 + strlen( argv0 ) + 1 < sizeof( candidate ) )
+					{
+						memcpy( candidate, p, dirLen );
+						candidate[ dirLen ] = '/';
+						strcpy( candidate + dirLen + 1, argv0 );
+						if ( access( candidate, X_OK ) == 0 && realpath( candidate, exePath ) )
+							break;
+					}
+					if ( !colon )
+						break;
+					p = colon + 1;
+				}
+			}
+		}
+	}
+
+	if ( !exePath[0] )
+		return false;
+
+	char *slash = strrchr( exePath, '/' );
+	if ( !slash )
+		return false;
+	if ( slash == exePath )
+		exePath[1] = '\0';
+	else
+		*slash = '\0';
+
+	strncpy( outDir, exePath, outSize - 1 );
+	outDir[ outSize - 1 ] = '\0';
+	return true;
+}
+
+static void *OpenLauncherFromDirs( const char *const *dirs, size_t dirCount )
+{
+	static const char *const kLibNames[] = {
+		"liblauncher" DLL_EXT_STRING,
+		"launcher" DLL_EXT_STRING,
+	};
+
+	for ( size_t i = 0; i < dirCount; i++ )
+	{
+		if ( !dirs[i] || !dirs[i][0] )
+			continue;
+		for ( size_t j = 0; j < sizeof( kLibNames ) / sizeof( kLibNames[0] ); j++ )
+		{
+			char path[ MAX_PATH ];
+			snprintf( path, sizeof( path ), "%s/%s", dirs[i], kLibNames[j] );
+			void *h = dlopen( path, RTLD_NOW );
+			if ( h )
+				return h;
+		}
+	}
+	return NULL;
+}
+
 int main( int argc, char *argv[] )
 {
-	void *launcher = dlopen( "liblauncher" DLL_EXT_STRING, RTLD_NOW );
-	if ( !launcher )
+	void *launcher = NULL;
+	char exeDir[ MAX_PATH ];
+	if ( GetExeDirPosix( argc > 0 ? argv[0] : NULL, exeDir, sizeof( exeDir ) ) )
 	{
-		launcher = dlopen( "bin/liblauncher" DLL_EXT_STRING, RTLD_NOW );
+		char dirBin[ MAX_PATH ];
+		char dirSrcEng[ MAX_PATH ];
+		char dirParentSrcEng[ MAX_PATH ];
+		snprintf( dirBin, sizeof( dirBin ), "%s/bin", exeDir );
+		snprintf( dirSrcEng, sizeof( dirSrcEng ), "%s/lib/srceng", exeDir );
+		snprintf( dirParentSrcEng, sizeof( dirParentSrcEng ), "%s/../lib/srceng", exeDir );
+		const char *exeDirs[] = { exeDir, dirBin, dirSrcEng, dirParentSrcEng };
+		launcher = OpenLauncherFromDirs( exeDirs, sizeof( exeDirs ) / sizeof( exeDirs[0] ) );
 	}
+
 	if ( !launcher )
 	{
-		launcher = dlopen( "launcher" DLL_EXT_STRING, RTLD_NOW );
-	}
-	if ( !launcher )
-	{
-		launcher = dlopen( "bin/launcher" DLL_EXT_STRING, RTLD_NOW );
+		static const char *const kRelCandidates[] = {
+			"liblauncher" DLL_EXT_STRING,
+			"bin/liblauncher" DLL_EXT_STRING,
+			"lib/srceng/liblauncher" DLL_EXT_STRING,
+			"../lib/srceng/liblauncher" DLL_EXT_STRING,
+			"launcher" DLL_EXT_STRING,
+			"bin/launcher" DLL_EXT_STRING,
+			"lib/srceng/launcher" DLL_EXT_STRING,
+		};
+		for ( size_t i = 0; i < sizeof( kRelCandidates ) / sizeof( kRelCandidates[0] ) && !launcher; i++ )
+		{
+			launcher = dlopen( kRelCandidates[i], RTLD_NOW );
+		}
 	}
 
 	if ( !launcher )

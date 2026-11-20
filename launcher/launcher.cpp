@@ -16,6 +16,11 @@
 	#include <sys/stat.h>
 	#include <fcntl.h>
 	#include <locale.h>
+	#include <unistd.h>
+	#include <limits.h>
+#ifdef OSX
+	#include <mach-o/dyld.h>
+#endif
 #elif defined ( _X360 )
 #else
 #error
@@ -233,6 +238,38 @@ void SetGameDirectory( const char *game )
 	Q_strncpy( g_szGamedir, game, sizeof(g_szGamedir) );
 }
 
+#ifdef POSIX
+static bool HasGameRootMarker( const char *pDir, const char *pMod )
+{
+	if ( !pDir || !pDir[0] )
+		return false;
+
+	struct stat st;
+	char probe[ MAX_PATH ];
+	if ( pMod && pMod[0] )
+	{
+		Q_snprintf( probe, sizeof( probe ), "%s/%s/gameinfo.txt", pDir, pMod );
+		if ( stat( probe, &st ) == 0 )
+			return true;
+	}
+	Q_snprintf( probe, sizeof( probe ), "%s/hl2/gameinfo.txt", pDir );
+	if ( stat( probe, &st ) == 0 )
+		return true;
+
+	Q_snprintf( probe, sizeof( probe ), "%s/platform", pDir );
+	return ( stat( probe, &st ) == 0 && S_ISDIR( st.st_mode ) );
+}
+
+static bool StripParentDir( char *pDir )
+{
+	char *pSlash = strrchr( pDir, '/' );
+	if ( !pSlash || pSlash == pDir )
+		return false;
+	*pSlash = '\0';
+	return true;
+}
+#endif
+
 //-----------------------------------------------------------------------------
 // Gets the executable name
 //-----------------------------------------------------------------------------
@@ -240,6 +277,72 @@ bool GetExecutableName( char *out, int outSize )
 {
 #ifdef WIN32
 	return !!::GetModuleFileName( ( HINSTANCE )GetModuleHandle( NULL ), out, outSize );
+#elif defined( POSIX )
+	if ( !out || outSize <= 0 )
+		return false;
+	out[0] = '\0';
+
+#if defined( LINUX )
+	ssize_t nLen = readlink( "/proc/self/exe", out, outSize - 1 );
+	if ( nLen > 0 )
+	{
+		out[nLen] = '\0';
+		return true;
+	}
+#elif defined( OSX )
+	uint32_t nBufSize = (uint32_t)outSize;
+	if ( _NSGetExecutablePath( out, &nBufSize ) == 0 )
+	{
+		char resolved[ PATH_MAX ];
+		if ( realpath( out, resolved ) )
+		{
+			Q_strncpy( out, resolved, outSize );
+		}
+		return true;
+	}
+#endif
+
+	const char *argv0 = CommandLine()->GetParm( 0 );
+	if ( argv0 && argv0[0] )
+	{
+		char resolved[ PATH_MAX ];
+		if ( strchr( argv0, '/' ) )
+		{
+			if ( realpath( argv0, resolved ) )
+			{
+				Q_strncpy( out, resolved, outSize );
+				return true;
+			}
+			Q_strncpy( out, argv0, outSize );
+			return true;
+		}
+		const char *pEnvPath = getenv( "PATH" );
+		if ( pEnvPath )
+		{
+			const char *p = pEnvPath;
+			while ( *p )
+			{
+				const char *pColon = strchr( p, ':' );
+				size_t nDirLen = pColon ? (size_t)( pColon - p ) : strlen( p );
+				char candidate[ PATH_MAX ];
+				if ( nDirLen > 0 && nDirLen + 1 + strlen( argv0 ) + 1 < sizeof( candidate ) )
+				{
+					memcpy( candidate, p, nDirLen );
+					candidate[nDirLen] = '/';
+					strcpy( candidate + nDirLen + 1, argv0 );
+					if ( access( candidate, X_OK ) == 0 && realpath( candidate, resolved ) )
+					{
+						Q_strncpy( out, resolved, outSize );
+						return true;
+					}
+				}
+				if ( !pColon )
+					break;
+				p = pColon + 1;
+			}
+		}
+	}
+	return false;
 #else
 	return false;
 #endif
@@ -276,22 +379,54 @@ void UTIL_ComputeBaseDir()
 
 	if ( !g_szBasedir[0] && GetExecutableName( g_szBasedir, sizeof( g_szBasedir ) ) )
 	{
-		char *pBuffer = strrchr( g_szBasedir, '\\' );
-		if ( *pBuffer )
+		char *pBack = strrchr( g_szBasedir, '\\' );
+		char *pFwd = strrchr( g_szBasedir, '/' );
+		char *pBuffer = ( pBack > pFwd ) ? pBack : pFwd;
+		if ( pBuffer )
 		{
-			*(pBuffer+1) = '\0';
+			*(pBuffer + 1) = '\0';
 		}
 
 		int j = strlen( g_szBasedir );
-		if (j > 0)
+		if ( j > 1 && ( ( g_szBasedir[j - 1] == '\\' ) || ( g_szBasedir[j - 1] == '/' ) ) )
 		{
-			if ( ( g_szBasedir[j-1] == '\\' ) || 
-				 ( g_szBasedir[j-1] == '/' ) )
+			g_szBasedir[j - 1] = 0;
+		}
+	}
+
+#ifdef POSIX
+	if ( !CommandLine()->CheckParm( "-basedir" ) )
+	{
+		const char *pMod = CommandLine()->ParmValue( "-game", DEFAULT_HL2_GAMEDIR );
+		char szCandidate[ MAX_PATH ];
+		bool bFoundRoot = false;
+
+		if ( g_szBasedir[0] )
+		{
+			Q_strncpy( szCandidate, g_szBasedir, sizeof( szCandidate ) );
+			for ( int nUp = 0; nUp < 3; nUp++ )
 			{
-				g_szBasedir[j-1] = 0;
+				if ( HasGameRootMarker( szCandidate, pMod ) )
+				{
+					Q_strncpy( g_szBasedir, szCandidate, sizeof( g_szBasedir ) );
+					bFoundRoot = true;
+					break;
+				}
+				if ( !StripParentDir( szCandidate ) )
+					break;
+			}
+		}
+
+		if ( !bFoundRoot )
+		{
+			char szCwd[ MAX_PATH ];
+			if ( getcwd( szCwd, sizeof( szCwd ) ) && HasGameRootMarker( szCwd, pMod ) )
+			{
+				Q_strncpy( g_szBasedir, szCwd, sizeof( g_szBasedir ) );
 			}
 		}
 	}
+#endif
 
 	if ( IsPC() )
 	{

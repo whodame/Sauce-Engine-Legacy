@@ -596,8 +596,6 @@ def configure(conf):
 		conf.env.LIBDIR = conf.env.LIBDIR + '/srceng'
 
 	conf.env.TESTDIR = conf.env.LIBDIR + '/tests'
-	conf.define('BINDIR', conf.env.BINDIR)
-	conf.define('LIBDIR', conf.env.LIBDIR)
 
 	flags = []
 
@@ -607,9 +605,23 @@ def configure(conf):
 	if conf.env.DEST_OS != 'win32':
 		flags += ['-pipe', '-fPIC']
 		if conf.env.DEST_OS == 'darwin':
-			conf.env.RPATH = ['@loader_path', '@loader_path/bin', '@executable_path', '@executable_path/bin', conf.env.LIBDIR]
+			conf.env.RPATH = [
+				'@loader_path',
+				'@loader_path/bin',
+				'@loader_path/lib/srceng',
+				'@executable_path',
+				'@executable_path/bin',
+				'@executable_path/lib/srceng',
+				'@executable_path/../lib/srceng',
+			]
 		else:
-			conf.env.RPATH = ['$ORIGIN', '$ORIGIN/bin', '$ORIGIN/../lib/srceng', conf.env.LIBDIR]
+			conf.env.RPATH = [
+				'$ORIGIN',
+				'$ORIGIN/bin',
+				'$ORIGIN/lib/srceng',
+				'$ORIGIN/../lib',
+				'$ORIGIN/../lib/srceng',
+			]
 	if conf.env.COMPILER_CC != 'msvc':
 		flags += ['-pthread']
 
@@ -641,6 +653,10 @@ def configure(conf):
 
 	if conf.env.DEST_CPU in [ 'arm', 'thumb' ]:
 		flags += ['-march=armv7-a', '-mfpu=neon-vfpv4']
+
+	if conf.env.DEST_OS in ['freebsd', 'openbsd', 'netbsd', 'dragonflybsd']:
+		# BSD dynamic linkers ignore $ORIGIN in RPATH unless DF_1_ORIGIN is set.
+		linkflags += ['-Wl,-z,origin']
 
 	if conf.env.DEST_OS == 'openbsd':
 		linkflags += ['-Wl,-z,wxneeded']
