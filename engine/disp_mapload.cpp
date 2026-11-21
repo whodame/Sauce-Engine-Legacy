@@ -608,17 +608,13 @@ bool DispInfo_LoadDisplacements( model_t *pWorld, bool bRestoring )
 	DispInfo_ReleaseMaterialSystemObjects( pWorld );
 	
 	// load the displacement info structures into temporary space
-	// using temporary storage that is not the stack for compatibility with console stack
-#ifndef _X360
-	ddispinfo_t tempDisps[MAX_MAP_DISPINFO];
-#else
-	CUtlMemory< ddispinfo_t > m_DispInfoBuf( 0, MAX_MAP_DISPINFO );
-	ddispinfo_t *tempDisps = m_DispInfoBuf.Base();
-#endif
+	// using temporary storage that is not the stack to avoid stack overflow with expanded MAX_MAP_DISPINFO
 	ErrorIfNot( 
 		nDisplacements <= MAX_MAP_DISPINFO,
 		("DispInfo_LoadDisplacements: nDisplacements (%d) > MAX_MAP_DISPINFO (%d)", nDisplacements, MAX_MAP_DISPINFO)
 		);
+	CUtlMemory< ddispinfo_t > m_DispInfoBuf( 0, MAX( nDisplacements, 1 ) );
+	ddispinfo_t *tempDisps = m_DispInfoBuf.Base();
 	CMapLoadHelper lhDispInfo( LUMP_DISPINFO );
 	lhDispInfo.LoadLumpData( 0, nDisplacements * sizeof( ddispinfo_t ), tempDisps );
 

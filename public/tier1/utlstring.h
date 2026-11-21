@@ -83,8 +83,12 @@ public:
 	// Move assignment operator:
 	CUtlString& operator=( CUtlString&& rhs )
 	{
+		if ( this == &rhs )
+			return *this;
+
 		// Move the string pointer from the source to this -- be sure to
 		// zero out the source to avoid double frees.
+		Purge();
 		m_pString = rhs.m_pString;
 		rhs.m_pString = 0;
 		return *this;

@@ -185,6 +185,7 @@ protected:
 	// Rotor sound
 	void	InputEnableRotorSound( inputdata_t &inputdata );
 	void	InputDisableRotorSound( inputdata_t &inputdata );
+	void	InputSetRotorSoundScale( inputdata_t &inputdata ) { m_flRotorSoundScale = inputdata.value.Float(); }
 
 protected:
 	CSoundPatch		*m_pRotorSound;				// Rotor loop played when the player can see the helicopter
@@ -212,6 +213,7 @@ protected:
 	Vector			m_vecRandomOffset;
 	float			m_flRotorWashEntitySearchTime;
 	bool			m_bSuppressSound;
+	float			m_flRotorSoundScale;
 
 	EHANDLE			m_hRotorWash;	// Attached rotorwash entity
 

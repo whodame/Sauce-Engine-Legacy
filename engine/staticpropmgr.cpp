@@ -1326,31 +1326,63 @@ void CStaticPropMgr::UnserializeModels( CUtlBuffer& buf )
 	}
 
 	int count = buf.GetInt();
+	if ( count <= 0 )
+		return;
+
+	int nRemainingBytes = buf.TellMaxPut() - buf.TellGet();
+	int nEntryBytes = nRemainingBytes / count;
 
 	// Gotta preallocate the static props here so no rellocations take place
 	// the leaf list stores pointers to these tricky little guys.
 	m_StaticProps.AddMultipleToTail(count);
 	for ( int i = 0; i < count; ++i )
 	{
+		int nEntryStart = buf.TellGet();
 		StaticPropLump_t lump;
 		switch ( nLumpVersion )
 		{
 			case 4: UnserializeLump<StaticPropLumpV4_t>(&lump, buf); break;
 			case 5: UnserializeLump<StaticPropLumpV5_t>(&lump, buf); break;
 			case 6: UnserializeLump<StaticPropLumpV6_t>(&lump, buf); break;
-			case 7: // Falls down to version 10. We promoted TF to version 10 to deal with SFM. 
+			case 7:
+			{
+				if ( nEntryBytes == (int)sizeof(StaticPropLumpV7_t) )
+					UnserializeLump<StaticPropLumpV7_t>(&lump, buf);
+				else
+					UnserializeLump<StaticPropLumpV10_t>(&lump, buf);
+				break;
+			}
+			case 8: UnserializeLump<StaticPropLumpV8_t>(&lump, buf); break;
+			case 9: UnserializeLump<StaticPropLumpV9_t>(&lump, buf); break;
 			case 10:
 			{
-				if( s_MapVersion == 21 )
+				if ( s_MapVersion == 21 || nEntryBytes == (int)sizeof(StaticPropLumpV10_21_t) )
 					UnserializeLump<StaticPropLumpV10_21_t>(&lump, buf);
 				else
 					UnserializeLump<StaticPropLumpV10_t>(&lump, buf);
 				break;
 			}
-			case 9: UnserializeLump<StaticPropLumpV9_t>(&lump, buf); break;
-			case 11: UnserializeLump<StaticPropLumpV11_t>(&lump, buf); break;
+			case 11:
+			{
+				if ( nEntryBytes == (int)sizeof(StaticPropLumpV10_21_t) )
+					UnserializeLump<StaticPropLumpV10_21_t>(&lump, buf);
+				else
+					UnserializeLump<StaticPropLumpV11_t>(&lump, buf);
+				break;
+			}
 			default:
-				Assert("Unexpected version while deserializing lumps.");
+			{
+				if ( nEntryBytes >= (int)sizeof(StaticPropLumpV11_t) )
+				{
+					UnserializeLump<StaticPropLumpV11_t>(&lump, buf);
+					buf.SeekGet( CUtlBuffer::SEEK_HEAD, nEntryStart + nEntryBytes );
+				}
+				else
+				{
+					Assert( !"Unexpected version while deserializing lumps." );
+				}
+				break;
+			}
 		}
 
 		m_StaticProps[i].Init( i, lump, m_StaticPropDict[lump.m_PropType].m_pModel );
@@ -1971,6 +2003,7 @@ void CStaticPropMgr::DrawStaticProps_FastPipeline( IClientRenderable **pProps, i
 	if ( count > MAX_OBJECTS )
 	{
 		DrawStaticProps_FastPipeline( pProps + MAX_OBJECTS, count - MAX_OBJECTS, bShadowDepth );
+		count = MAX_OBJECTS;
 	}
 
 	for ( int i = 0; i < count; i++ )

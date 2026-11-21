@@ -369,6 +369,7 @@ struct StaticPropLump_t
 	color32			m_DiffuseModulation;	// per instance color and alpha modulation
 	bool			m_bDisableX360;
 	int				m_FlagsEx;				// more flags (introduced in v10)
+	float			m_flPropScale;
 
 	inline StaticPropLump_t& operator=(const StaticPropLumpV4_t& _rhs)
 	{
@@ -391,10 +392,13 @@ struct StaticPropLump_t
 		m_nMaxDXLevel			= 0;
 		m_nLightmapResolutionX	= 0;
 		m_nLightmapResolutionY	= 0;
-		m_DiffuseModulation.r = 0;
-		m_DiffuseModulation.g = 0;
-		m_DiffuseModulation.b = 0;
-		m_DiffuseModulation.a = 0;
+		m_DiffuseModulation.r	= 255;
+		m_DiffuseModulation.g	= 255;
+		m_DiffuseModulation.b	= 255;
+		m_DiffuseModulation.a	= 255;
+		m_bDisableX360			= false;
+		m_FlagsEx				= 0;
+		m_flPropScale			= 1.0f;
 
 		// Older versions don't want this.
 		m_Flags					|= STATIC_PROP_NO_PER_TEXEL_LIGHTING;		
@@ -418,11 +422,27 @@ struct StaticPropLump_t
 		return *this;
 	}
 
-	inline StaticPropLump_t& operator=(const StaticPropLumpV9_t& _rhs)
+	inline StaticPropLump_t& operator=(const StaticPropLumpV7_t& _rhs)
+	{
+		(*this) = reinterpret_cast<const StaticPropLumpV6_t&>(_rhs);
+
+		m_DiffuseModulation = _rhs.m_DiffuseModulation;
+		return *this;
+	}
+
+	inline StaticPropLump_t& operator=(const StaticPropLumpV8_t& _rhs)
 	{
 		(*this) = reinterpret_cast<const StaticPropLumpV5_t&>(_rhs);
 
 		m_DiffuseModulation = _rhs.m_DiffuseModulation;
+		return *this;
+	}
+
+	inline StaticPropLump_t& operator=(const StaticPropLumpV9_t& _rhs)
+	{
+		(*this) = reinterpret_cast<const StaticPropLumpV8_t&>(_rhs);
+
+		m_bDisableX360 = _rhs.m_bDisableX360;
 		return *this;
 	}
 
@@ -447,6 +467,7 @@ struct StaticPropLump_t
 	inline StaticPropLump_t& operator=(const StaticPropLumpV11_t& _rhs)
 	{
 		(*this) = reinterpret_cast<const StaticPropLumpV10_21_t&>(_rhs);
+		m_flPropScale = _rhs.m_flPropScale;
 		return *this;
 	}
 };

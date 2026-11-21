@@ -50,6 +50,8 @@ struct busyanim_t
 	float				flMaxTime;		// Max time spent in this busy animation. 0 means continue until interrupted.
 	busyinterrupt_t		iBusyInterruptType;
 	bool				bUseAutomovement;
+	bool				bTranslateActivity;
+	bool				bMapCustom;		// Indicates this was from an ai_hint_actbusy_custom
 };
 
 struct busysafezone_t

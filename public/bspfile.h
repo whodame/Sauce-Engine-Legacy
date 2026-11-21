@@ -54,50 +54,50 @@
 #define NUM_DISP_POWER_TRIS(power)	( (1 << (power)) * (1 << (power)) * 2 )
 
 #if !defined( BSP_USE_LESS_MEMORY )
-// Common limits
+// Common limits (expanded to Mapbase / Garry's Mod levels where not constrained by 16-bit BSP disk fields)
 // leaffaces, leafbrushes, planes, and verts are still bounded by
 // 16 bit short limits
-#define	MAX_MAP_MODELS					1024
-#define	MAX_MAP_BRUSHES					8192
-#define	MAX_MAP_ENTITIES				8192
-#define	MAX_MAP_TEXINFO					12288
-#define MAX_MAP_TEXDATA					2048
-#define MAX_MAP_DISPINFO				4096
+#define	MAX_MAP_MODELS					4096
+#define	MAX_MAP_BRUSHES					65535
+#define	MAX_MAP_ENTITIES				65536
+#define	MAX_MAP_TEXINFO					32768
+#define MAX_MAP_TEXDATA					8192
+#define MAX_MAP_DISPINFO				8192
 #define MAX_MAP_DISP_VERTS				( MAX_MAP_DISPINFO * ((1<<MAX_MAP_DISP_POWER)+1) * ((1<<MAX_MAP_DISP_POWER)+1) )
 #define MAX_MAP_DISP_TRIS				( (1 << MAX_MAP_DISP_POWER) * (1 << MAX_MAP_DISP_POWER) * 2 )
 #define MAX_DISPVERTS					NUM_DISP_POWER_VERTS( MAX_MAP_DISP_POWER )
 #define MAX_DISPTRIS					NUM_DISP_POWER_TRIS( MAX_MAP_DISP_POWER )
 #define	MAX_MAP_AREAS					256
 #define MAX_MAP_AREA_BYTES				(MAX_MAP_AREAS/8)
-#define	MAX_MAP_AREAPORTALS				1024
+#define	MAX_MAP_AREAPORTALS				2048
 // Planes come in pairs, thus an even number.
 #define	MAX_MAP_PLANES					65536
 #define	MAX_MAP_NODES					65536
-#define	MAX_MAP_BRUSHSIDES				65536
+#define	MAX_MAP_BRUSHSIDES				524288
 #define	MAX_MAP_LEAFS					65536
 #define	MAX_MAP_VERTS					65536
-#define MAX_MAP_VERTNORMALS				256000
-#define MAX_MAP_VERTNORMALINDICES		256000
+#define MAX_MAP_VERTNORMALS				512000
+#define MAX_MAP_VERTNORMALINDICES		512000
 #define	MAX_MAP_FACES					65536
 #define	MAX_MAP_LEAFFACES				65536
 #define	MAX_MAP_LEAFBRUSHES 			65536
 #define	MAX_MAP_PORTALS					65536
 #define MAX_MAP_CLUSTERS				65536
 #define MAX_MAP_LEAFWATERDATA			32768
-#define MAX_MAP_PORTALVERTS				128000
-#define	MAX_MAP_EDGES					256000
-#define	MAX_MAP_SURFEDGES				512000
-#define	MAX_MAP_LIGHTING				0x1000000
-#define	MAX_MAP_VISIBILITY				0x1000000			// increased BSPVERSION 7
-#define	MAX_MAP_TEXTURES				1024
-#define MAX_MAP_WORLDLIGHTS				8192
-#define MAX_MAP_CUBEMAPSAMPLES			1024
-#define MAX_MAP_OVERLAYS				512 
-#define MAX_MAP_WATEROVERLAYS			16384
-#define MAX_MAP_TEXDATA_STRING_DATA		256000
+#define MAX_MAP_PORTALVERTS				256000
+#define	MAX_MAP_EDGES					512000
+#define	MAX_MAP_SURFEDGES				1024000
+#define	MAX_MAP_LIGHTING				0x4000000
+#define	MAX_MAP_VISIBILITY				0x4000000			// increased BSPVERSION 7
+#define	MAX_MAP_TEXTURES				4096
+#define MAX_MAP_WORLDLIGHTS				65536
+#define MAX_MAP_CUBEMAPSAMPLES			4096
+#define MAX_MAP_OVERLAYS				8192 
+#define MAX_MAP_WATEROVERLAYS			65536
+#define MAX_MAP_TEXDATA_STRING_DATA		1024000
 #define MAX_MAP_TEXDATA_STRING_TABLE	65536
 // this is stuff for trilist/tristrips, etc.
-#define MAX_MAP_PRIMITIVES				32768
+#define MAX_MAP_PRIMITIVES				65536
 #define MAX_MAP_PRIMVERTS				65536
 #define MAX_MAP_PRIMINDICES				65536
 
@@ -391,6 +391,46 @@ struct dheader_t
 	lump_t		lumps[HEADER_LUMPS];
 	int			mapRevision;				// the map's revision (iteration, version) number (added BSPVERSION 6)
 };
+
+// Detects and normalizes Left 4 Dead 2 BSP v21 lump_t field order (version, fileofs, filelen)
+// into standard Source lump_t field order (fileofs, filelen, version).
+inline void BSP_FixupL4D2Lumps( dheader_t &header )
+{
+	if ( header.version != 21 )
+		return;
+
+	bool bIsL4D2Order = false;
+	for ( int i = 0; i < HEADER_LUMPS; ++i )
+	{
+		const lump_t &l = header.lumps[i];
+		if ( l.fileofs == 0 && l.filelen == 0 && l.version == 0 )
+			continue;
+		if ( l.fileofs >= 0 && l.fileofs <= 16 && l.filelen >= (int)sizeof( dheader_t ) )
+		{
+			bIsL4D2Order = true;
+			break;
+		}
+		if ( l.fileofs >= (int)sizeof( dheader_t ) )
+		{
+			bIsL4D2Order = false;
+			break;
+		}
+	}
+
+	if ( bIsL4D2Order )
+	{
+		for ( int i = 0; i < HEADER_LUMPS; ++i )
+		{
+			lump_t &l = header.lumps[i];
+			int actualVersion = l.fileofs;
+			int actualFileOfs = l.filelen;
+			int actualFileLen = l.version;
+			l.fileofs = actualFileOfs;
+			l.filelen = actualFileLen;
+			l.version = actualVersion;
+		}
+	}
+}
 
 // level feature flags
 #define LVLFLAGS_BAKED_STATIC_PROP_LIGHTING_NONHDR 0x00000001	// was processed by vrad with -staticproplighting, no hdr data

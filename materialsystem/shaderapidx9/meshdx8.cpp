@@ -68,8 +68,8 @@ int CIndexBuffer::s_BufferCount = 0;
 //-----------------------------------------------------------------------------
 enum
 {
-	VERTEX_BUFFER_SIZE = 262144,
-	MAX_QUAD_INDICES = 16384,
+	VERTEX_BUFFER_SIZE = 524288,
+	MAX_QUAD_INDICES = 65536,
 };
 
 

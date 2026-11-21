@@ -75,7 +75,7 @@ static int				g_iLastReplacedDynamic = -1;
 
 CUtlVector<decal_t*>		s_aDecalPool;
 
-const int DECALCACHE_ENTRY_COUNT = 1024;
+const int DECALCACHE_ENTRY_COUNT = 4096;
 const int INVALID_CACHE_ENTRY = 0xFFFF;
 
 class ALIGN16 CDecalVertCache
@@ -551,7 +551,7 @@ static WorldDecalHandle_t DecalToHandle( decal_t *pDecal )
 void R_DecalInit( void )
 {
 	g_nMaxDecals = Q_atoi( r_decals.GetDefault() );
-	g_nMaxDecals = MAX(64, g_nMaxDecals);
+	g_nMaxDecals = MAX(4096, g_nMaxDecals);
 	Assert( g_DecalAllocator.Count() == 0 );
 	g_nDynamicDecals = 0;
 	g_nStaticDecals = 0;

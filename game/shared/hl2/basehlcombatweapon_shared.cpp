@@ -62,6 +62,14 @@ void CBaseHLCombatWeapon::ItemHolsterFrame( void )
 	if ( GetOwner()->GetActiveWeapon() == this )
 		return;
 
+	if ( GetOwner()->GetActiveWeapon() )
+	{
+		// Player can't be holding another weapon that shares our ammo
+		CBaseCombatWeapon *pWeapon = GetOwner()->GetActiveWeapon();
+		if ( pWeapon->GetPrimaryAmmoType() == m_iPrimaryAmmoType || pWeapon->GetSecondaryAmmoType() == m_iSecondaryAmmoType )
+			return;
+	}
+
 	// If it's been longer than three seconds, reload
 	if ( ( gpGlobals->curtime - m_flHolsterTime ) > sk_auto_reload_time.GetFloat() )
 	{

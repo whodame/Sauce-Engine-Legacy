@@ -4,7 +4,8 @@
 [![Fork](https://img.shields.io/badge/🍴_Fork-the_repo-blue?style=for-the-badge)](https://github.com/whodame/Sauce-Engine-Legacy/fork)
 [![Watch](https://img.shields.io/badge/👀_Watch-for_updates-success?style=for-the-badge)](https://github.com/whodame/Sauce-Engine-Legacy)
 
-**Original repository (upstream Source Engine):** [nillerusr/source-engine](https://github.com/nillerusr/source-engine)
+**Original repository (upstream Source Engine):** [nillerusr/source-engine](https://github.com/nillerusr/source-engine)  
+**Integrated references:** [ValveSoftware/source-sdk-2013](https://github.com/ValveSoftware/source-sdk-2013) • [mapbase-source-sdk-2013](https://github.com/mapbase-source-sdk-2013/source-sdk-2013)
 
 ⭐ If this project is useful to you, please star the repository, and watch it to follow updates!
 
@@ -35,6 +36,10 @@
 - **Rendering & Asset Pipeline Fixes**:
   - Restored shader permutation structures for standard Source Engine VCS binaries, eliminating the `Couldn't load combo of shader` error.
   - Native loading support for custom and modern TrueType fonts (`GorDIN-*.ttf`).
+- **Expanded Engine Limits & Format Compatibility (Mapbase / GMod Level)**:
+  - Raised BSP limits (`MAX_MAP_MODELS = 4096`, `MAX_MAP_BRUSHES = 65535`, `MAX_MAP_ENTITIES = 65536`, `MAX_MAP_DISPINFO = 8192`, `MAX_MAP_LIGHTING`/`VISIBILITY = 64 MB`) and dynamic vertex/index buffers (`DYNAMIC_VERTEX_BUFFER_MEMORY = 32 MB`, `INDEX_BUFFER_SIZE = 262144`, `VERTEX_BUFFER_SIZE = 524288`).
+  - Integrated bugfixes and AI/gameplay features from **Source SDK 2013** and **Mapbase** (`ai_hint_actbusy_custom`, vehicle AI options, `CEventQueue::CancelPending` & ragdoll collision hash fixes).
+  - Added auto-detection for **L4D2 BSP v21** lump ordering, **StaticPropLump v4–v11** (including GMod/L4D1/L4D2/CS:GO), and **VPK v1/v2** embedded file offsets.
 - **Network & Standalone Independence**:
   - Operates without requiring the Steam client process (`steam_appid.txt` / standalone initialization).
   - Protocol support for Counter-Strike: Source (v25) and Half-Life 2 Deathmatch.
@@ -89,21 +94,25 @@ git submodule update --init --recursive
 Run the `waf` script from the repository root.
 
 #### Windows (MSVC x64)
-You can direct intermediate build artifacts to a separate build folder (e.g., `build` or a custom directory on Drive D:) to keep the source tree clean:
+You can direct intermediate build artifacts to a separate build folder (e.g., `build`) and install into a standalone directory (`dist`) to keep the source tree clean:
 
 ```cmd
-python waf configure -b build --prefix=dist --msvc_targets=x64 --disable-sourcevr
-python waf build
+python waf configure -T release --out=build --prefix=dist --build-games=hl2
+python waf build --out=build
+python waf install --out=build
 ```
 
 #### Linux / macOS / BSD
 ```bash
-python3 waf configure -b build --prefix=dist
-python3 waf build
+python3 waf configure -T release --out=build --prefix=dist --build-games=hl2
+python3 waf build --out=build
+python3 waf install --out=build
 ```
 
 Common Build Options:
-- `-b <path>`: Directory for compiled object files and build cache.
+- `--out=<path>` / `-b <path>`: Directory for compiled object files and build cache.
+- `--prefix=<path>`: Installation directory where shared engine binaries (`bin/`) and per-game binaries (`<game>/bin/`) are placed.
+- `--build-games=<games>`: Comma-separated list of game modules to build (`hl2`, `episodic`, `hl2mp`, `portal`, `hl1`, `hl1mp`, `cstrike`, `dod`, `lostcoast`), or `all` to build all supported games into `<prefix>/<game>/bin/`.
 - `-j <threads>`: Parallel compilation threads (defaults to total CPU cores).
 - `--disable-sourcevr`: Disables building the SourceVR / OpenVR module when OpenVR headers are not installed.
 - `--wayland-only`: (Linux/BSD) Compiles with zero dependencies on X11 and GLX.
@@ -213,6 +222,14 @@ Useful Launch Arguments:
 - `-novid`: Skips the introductory Valve video.
 - `-condebug`: Logs all engine console messages directly to `hl2/console.log`.
 - `+map <map_name>`: Automatically loads the specified level on startup.
+
+---
+
+## References
+
+- **Upstream Source Engine:** [nillerusr/source-engine](https://github.com/nillerusr/source-engine)
+- **Valve Source SDK 2013:** [ValveSoftware/source-sdk-2013](https://github.com/ValveSoftware/source-sdk-2013)
+- **Mapbase Source SDK 2013:** [mapbase-source-sdk-2013/source-sdk-2013](https://github.com/mapbase-source-sdk-2013/source-sdk-2013)
 
 ---
 

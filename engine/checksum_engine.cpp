@@ -170,6 +170,8 @@ bool CRC_MapFile(CRC32_t *crcvalue, const char *pszFileName)
 		return false;
 	}
 
+	BSP_FixupL4D2Lumps( header );
+
 	if ( IsX360() )
 	{
 		// 360 bsp's store the pc checksum in the flags lump header
@@ -255,6 +257,8 @@ bool MD5_MapFile(MD5Value_t *md5value, const char *pszFileName)
 		ConMsg("Map [%s] has incorrect BSP version (%i should be %i).\n", pszFileName, i, BSPVERSION);
 		return false;
 	}
+
+	BSP_FixupL4D2Lumps( header );
 
 	if ( IsX360() )
 	{

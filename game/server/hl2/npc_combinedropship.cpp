@@ -317,6 +317,7 @@ private:
 	EHANDLE		m_hPickupTarget;
 	int			m_iContainerMoveType;
 	bool		m_bWaitForDropoffInput;
+	bool		m_bUseAvoidEnts;
 
 	DECLARE_DATADESC();
 	DEFINE_CUSTOM_AI;
@@ -770,6 +771,7 @@ BEGIN_DATADESC( CNPC_CombineDropship )
 	DEFINE_FIELD( m_hLandTarget, FIELD_EHANDLE ),
 	DEFINE_FIELD( m_bHasDroppedOff, FIELD_BOOLEAN ),
 	DEFINE_KEYFIELD( m_bInvulnerable, FIELD_BOOLEAN, "Invulnerable" ),
+	DEFINE_KEYFIELD( m_bUseAvoidEnts, FIELD_BOOLEAN, "UseAvoidEnts" ),
 	DEFINE_KEYFIELD( m_iszLandTarget, FIELD_STRING,	"LandTarget" ),
 	DEFINE_SOUNDPATCH( m_pRotorOnGroundSound ),
 	DEFINE_SOUNDPATCH( m_pDescendingWarningSound ),
@@ -1239,6 +1241,16 @@ void CNPC_CombineDropship::Flight( void )
 				flAmount = clamp( flAmount, 0, 1 );
 				VectorMA( accel, flAmount * 200.0f, vecDelta, accel );
 			}
+		}
+
+		// Apply avoidance forces
+		if ( m_bUseAvoidEnts )
+		{
+			Vector vecAvoidForce;
+			CAvoidSphere::ComputeAvoidanceForces( this, 350.0f, 2.0f, &vecAvoidForce );
+			accel += vecAvoidForce;
+			CAvoidBox::ComputeAvoidanceForces( this, 350.0f, 2.0f, &vecAvoidForce );
+			accel += vecAvoidForce;
 		}
 
 		// don't fall faster than 0.2G or climb faster than 2G

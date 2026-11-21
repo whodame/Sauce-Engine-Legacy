@@ -471,6 +471,7 @@ void CMapLoadHelper::Init( model_t *pMapModel, const char *loadname )
 		return;
 	}
 
+	BSP_FixupL4D2Lumps( s_MapHeader );
 	s_MapVersion = s_MapHeader.version;
 
 	V_strcpy_safe( s_szLoadName, loadname );
@@ -575,6 +576,8 @@ void CMapLoadHelper::InitFromMemory( model_t *pMapModel, const void *pData, int 
 		Host_Error( "CMapLoadHelper::Init, map %s has wrong version (%i when expecting %i)\n", s_szMapName, s_MapHeader.version, BSPVERSION );
 		return;
 	}
+
+	BSP_FixupL4D2Lumps( s_MapHeader );
 
 	// Store map version
 	g_ServerGlobalVariables.mapversion = s_MapHeader.mapRevision;

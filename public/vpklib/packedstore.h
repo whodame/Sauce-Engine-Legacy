@@ -387,6 +387,7 @@ private:
 	char m_pszFileBaseName[MAX_PATH];
 	char m_pszFullPathName[MAX_PATH];
 	int m_nDirectoryDataSize;
+	uint32 m_nHeaderSize;
 	int m_nWriteChunkSize;
 	bool m_bUseDirFile;
 

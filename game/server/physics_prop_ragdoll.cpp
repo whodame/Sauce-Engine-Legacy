@@ -20,6 +20,8 @@
 #include "AI_Criteria.h"
 #include "ragdoll_shared.h"
 #include "hierarchy.h"
+#include "physics_shared.h"
+#include "vphysics/object_hash.h"
 
 // memdbgon must be the last include file in a .cpp file!!!
 #include "tier0/memdbgon.h"
@@ -248,11 +250,21 @@ void CRagdollProp::CalcRagdollSize( void )
 
 void CRagdollProp::UpdateOnRemove( void )
 {
+	if ( g_EntityCollisionHash )
+	{
+		g_EntityCollisionHash->RemoveAllPairsForObject( this );
+	}
+
 	for ( int i = 0; i < m_ragdoll.listCount; i++ )
 	{
-		if ( m_ragdoll.list[i].pObject )
+		IPhysicsObject *pObject = m_ragdoll.list[i].pObject;
+		if ( pObject )
 		{
-			g_pPhysSaveRestoreManager->ForgetModel( m_ragdoll.list[i].pObject );
+			if ( g_EntityCollisionHash )
+			{
+				g_EntityCollisionHash->RemoveAllPairsForObject( pObject );
+			}
+			g_pPhysSaveRestoreManager->ForgetModel( pObject );
 		}
 	}
 

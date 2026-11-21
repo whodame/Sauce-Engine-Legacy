@@ -420,24 +420,25 @@ void CWeaponStunStick::SetStunState( bool state )
 {
 	m_bActive = state;
 
+#ifdef CLIENT_DLL
 	if ( m_bActive )
 	{
-		//FIXME: START - Move to client-side
-
 		Vector vecAttachment;
 		QAngle vecAttachmentAngles;
 
 		GetAttachment( 1, vecAttachment, vecAttachmentAngles );
 		g_pEffects->Sparks( vecAttachment );
-
-		//FIXME: END - Move to client-side
-
+	}
+#else
+	if ( m_bActive )
+	{
 		EmitSound( "Weapon_StunStick.Activate" );
 	}
 	else
 	{
 		EmitSound( "Weapon_StunStick.Deactivate" );
 	}
+#endif
 }
 
 //-----------------------------------------------------------------------------

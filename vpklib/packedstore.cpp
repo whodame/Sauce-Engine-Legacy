@@ -216,6 +216,7 @@ void CPackedStore::Init( void )
 	m_pszFullPathName[0] = 0;
 	memset( m_pExtensionData, 0, sizeof( m_pExtensionData ) );
 	m_nDirectoryDataSize = 0;
+	m_nHeaderSize = sizeof( VPKDirHeader_t );
 	m_nWriteChunkSize = k_nVPKDefaultChunkSize;
 
 	m_nSizeOfSignedData = 0;
@@ -339,6 +340,7 @@ CPackedStore::CPackedStore( char const *pFileBasename, char *pszFName, IBaseFile
 				dirHeader.m_nSignatureSize = 0;
 			}
 			uint32 nSizeOfHeader = dirFile.Tell();
+			m_nHeaderSize = nSizeOfHeader;
 			int nSize = dirHeader.m_nDirectorySize;
 			m_nDirectoryDataSize = dirHeader.m_nDirectorySize;
 			m_DirectoryData.SetCount( nSize );
@@ -1183,7 +1185,7 @@ int CPackedStore::ReadData( CPackedStoreFileHandle &handle, void *pOutData, int 
 			if ( handle.m_nFileNumber == VPKFILENUMBER_EMBEDDED_IN_DIR_FILE )
 			{
 				// for file data in the directory header, all offsets are relative to the size of the dir header.
-				nDesiredPos += m_nDirectoryDataSize + sizeof( VPKDirHeader_t );
+				nDesiredPos += m_nDirectoryDataSize + m_nHeaderSize;
 			}
 
 			if ( m_PackedStoreReadCache.BCanSatisfyFromReadCache( (uint8 *)pOutData, handle, fHandle, nDesiredPos, nNumBytes, nRead ) )

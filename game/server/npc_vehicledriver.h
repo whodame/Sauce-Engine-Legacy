@@ -167,6 +167,8 @@ public:
 	void			InputStartFiring( inputdata_t &inputdata );
 	void			InputStopFiring( inputdata_t &inputdata );
 	void			InputGotoPathCorner( inputdata_t &inputdata );
+	void			InputSetUseAINodes( inputdata_t &inputdata );
+	void			InputSetUseCombatAI( inputdata_t &inputdata );
 
 public:
 	string_t		m_iszVehicleName;
@@ -186,6 +188,8 @@ public:
 	float				m_flDistanceAlongSpline;
 	float				m_flDriversMaxSpeed;
 	float				m_flDriversMinSpeed;
+	bool				m_bUseAINodes;
+	bool				m_bUseCombatAI;
 
 	// Speed
 	float				m_flMaxSpeed;		// Maximum speed this driver will go

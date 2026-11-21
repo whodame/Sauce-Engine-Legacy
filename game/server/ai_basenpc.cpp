@@ -9043,9 +9043,7 @@ int CAI_BaseNPC::DrawDebugTextOverlays(void)
 			CAI_BehaviorBase *pBehavior = GetRunningBehavior();
 			if ( pBehavior )
 			{
-				Q_snprintf(tempstr,sizeof(tempstr),"Behv: %s, ", pBehavior->GetName() );
-				EntityText(text_offset,tempstr,0);
-				text_offset++;
+				text_offset = pBehavior->DrawDebugTextOverlays( text_offset );
 			}
 
 			const char *pName = NULL;

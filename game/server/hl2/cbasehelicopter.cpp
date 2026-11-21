@@ -99,6 +99,7 @@ BEGIN_DATADESC( CBaseHelicopter )
 	DEFINE_FIELD( m_vecRandomOffset, FIELD_VECTOR ),
 	DEFINE_FIELD( m_flRotorWashEntitySearchTime, FIELD_TIME ),
 	DEFINE_FIELD( m_bSuppressSound,		FIELD_BOOLEAN ),
+	DEFINE_KEYFIELD( m_flRotorSoundScale, FIELD_FLOAT, "RotorSoundScale" ),
 	DEFINE_FIELD( m_flStartupTime,	FIELD_TIME ),
 
 	DEFINE_FIELD( m_cullBoxMins,	FIELD_VECTOR ),
@@ -119,6 +120,7 @@ BEGIN_DATADESC( CBaseHelicopter )
 	DEFINE_INPUTFUNC( FIELD_STRING, "SetAngles", InputSetAngles ),
 	DEFINE_INPUTFUNC( FIELD_VOID, "EnableRotorSound", InputEnableRotorSound ),
 	DEFINE_INPUTFUNC( FIELD_VOID, "DisableRotorSound", InputDisableRotorSound ),
+	DEFINE_INPUTFUNC( FIELD_FLOAT, "SetRotorSoundScale", InputSetRotorSoundScale ),
 	DEFINE_INPUTFUNC( FIELD_VOID, "Kill", InputKill ),
 
 END_DATADESC()
@@ -137,6 +139,7 @@ CBaseHelicopter::CBaseHelicopter( void )
 	m_cullBoxMaxs = vec3_origin;
 
 	m_hRotorWash = NULL;
+	m_flRotorSoundScale = 1.0f;
 }
 
 //------------------------------------------------------------------------------
@@ -1087,7 +1090,13 @@ void CBaseHelicopter::UpdateRotorWashVolume()
 //------------------------------------------------------------------------------
 float CBaseHelicopter::GetRotorVolume( void )
 {
-	return m_bSuppressSound ? 0.0f : 1.0f;
+	if ( m_bSuppressSound )
+		return 0.0f;
+
+	if ( m_flRotorSoundScale != 1.0f )
+		return m_flRotorSoundScale;
+
+	return 1.0f;
 }
 
 

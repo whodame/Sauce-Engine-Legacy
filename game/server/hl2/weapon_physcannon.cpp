@@ -4556,7 +4556,7 @@ CBaseEntity *PhysCannonGetHeldEntity( CBaseCombatWeapon *pActiveWeapon )
 CBaseEntity *GetPlayerHeldEntity( CBasePlayer *pPlayer )
 {
 	CBaseEntity *pObject = NULL;
-	CPlayerPickupController *pPlayerPickupController = (CPlayerPickupController *)(pPlayer->GetUseEntity());
+	CPlayerPickupController *pPlayerPickupController = dynamic_cast<CPlayerPickupController*>(pPlayer->GetUseEntity());
 
 	if ( pPlayerPickupController )
 	{

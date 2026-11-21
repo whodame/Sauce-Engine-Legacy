@@ -285,6 +285,7 @@ public:
 	Hint_e				HintType( void ) const			{ return (Hint_e)m_NodeData.nHintType;  };
 	void				SetHintType( int hintType, bool force = false );
 	string_t			HintActivityName( void ) const	{ return m_NodeData.iszActivityName; }
+	void				SetHintActivityName( string_t iszActivityName ) { m_NodeData.iszActivityName = iszActivityName; }
 	int					GetTargetNode( void ) const		{ return m_nTargetNodeID; }
 	bool				IsDisabled( void ) const		{ return (m_NodeData.iDisabled != 0); }
 	void				SetDisabled( bool bDisabled	)	{ m_NodeData.iDisabled = bDisabled; }
@@ -305,7 +306,6 @@ public:
 	bool				HintMatchesCriteria( CAI_BaseNPC *pNPC, const CHintCriteria &hintCriteria, const Vector &position, float *flNearestDistance, bool bIgnoreLock = false, bool bIgnoreHintType = false );
 	bool				IsInNodeFOV( CBaseEntity *pOther );
 
-private:
 	void				Spawn( void );
 	virtual void		Activate();
 	virtual void		UpdateOnRemove( void );

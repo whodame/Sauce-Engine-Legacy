@@ -492,6 +492,8 @@ struct Rule
 
 	Rule( const Rule& src )
 	{
+		m_szContext = NULL;
+
 		int i;
 		int c;
 		
